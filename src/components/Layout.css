@@ -1,0 +1,141 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #e2e8f0;
+  padding: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a202c;
+  padding: 0 1.25rem;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sidebar__group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.5rem;
+}
+
+.sidebar__category {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #a0aec0;
+  padding: 0.4rem 1.25rem 0.2rem;
+}
+
+.sidebar__link {
+  display: block;
+  padding: 0.45rem 1.25rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: #4a5568;
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.sidebar__link--indented {
+  padding-left: 1.75rem;
+}
+
+.sidebar__link:hover {
+  background: #f7fafc;
+  color: #2d3748;
+}
+
+.sidebar__link--active {
+  background: #ebf4ff;
+  color: #2b6cb0;
+  border-left-color: #4a90d9;
+  font-weight: 600;
+}
+
+/* ── Main Content ── */
+
+.main-content {
+  flex: 1;
+  padding: 2rem 2.5rem;
+  background: #f0f2f5;
+  overflow-y: auto;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1rem 0;
+  }
+
+  .sidebar__title {
+    margin-bottom: 0.75rem;
+  }
+
+  .sidebar__nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 0 1rem;
+  }
+
+  .sidebar__group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+    gap: 0.25rem;
+  }
+
+  .sidebar__category {
+    width: 100%;
+    padding: 0.3rem 0.5rem 0.1rem;
+  }
+
+  .sidebar__link {
+    padding: 0.35rem 0.75rem;
+    border-left: none;
+    border-radius: 6px;
+    font-size: 0.78rem;
+  }
+
+  .sidebar__link--indented {
+    padding-left: 0.75rem;
+  }
+
+  .sidebar__link--active {
+    background: #4a90d9;
+    color: #fff;
+    border-left-color: transparent;
+  }
+
+  .main-content {
+    padding: 1.5rem 1rem;
+  }
+}

@@ -1,0 +1,59 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #2d3748;
+  background: #f0f2f5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── Shared button styles ── */
+
+.btn {
+  padding: 0.6rem 1.6rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn--copy {
+  background: #48bb78;
+  color: #fff;
+}
+
+.btn--copy:hover {
+  background: #38a169;
+}
+
+.btn--clear {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.btn--clear:hover {
+  background: #cbd5e0;
+}
+
+.error-message {
+  text-align: center;
+  color: #e53e3e;
+  padding: 3rem;
+  font-size: 1rem;
+}
