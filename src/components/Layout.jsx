@@ -65,9 +65,19 @@ export default function Layout() {
                     onClick={() => toggleCategory(category)}
                   >
                     <span>{category}</span>
-                    <span className={`sidebar__chevron ${isExpanded ? 'sidebar__chevron--open' : ''}`}>
-                      {'\u25B8'}
-                    </span>
+                    <svg
+                      className={`sidebar__chevron ${isExpanded ? 'sidebar__chevron--open' : ''}`}
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M6 4l4 4-4 4" />
+                    </svg>
                   </button>
                   {isExpanded && (
                     <div className="sidebar__children">
