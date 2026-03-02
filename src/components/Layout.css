@@ -130,6 +130,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  background: transparent;
   border: none;
   cursor: pointer;
   font-family: inherit;
