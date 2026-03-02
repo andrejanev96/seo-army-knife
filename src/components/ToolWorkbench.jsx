@@ -38,6 +38,12 @@ export default function ToolWorkbench({ tool }) {
 
   return (
     <div className="workbench">
+      {tool.description && (
+        <div className="workbench__header">
+          <h2 className="workbench__title">{tool.category ? `${tool.category}: ${tool.name}` : tool.name}</h2>
+          <p className="workbench__description">{tool.description}</p>
+        </div>
+      )}
       <div className="workbench__panels">
         <div className="workbench__panel">
           <label className="workbench__label">{tool.inputLabel}</label>
