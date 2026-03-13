@@ -15,6 +15,7 @@ export default function LinkCleaner() {
   const iframeRef = useRef(null);
   const previewReadyRef = useRef(false);
   const placeholdersRef = useRef([]);
+  const pendingPreviewRef = useRef(null);
 
   // Input state
   const [domain, setDomain] = useState('');
@@ -67,6 +68,28 @@ export default function LinkCleaner() {
     return () => window.removeEventListener('message', handler);
   }, [toggleLink]);
 
+  // Apply pending preview to iframe after it appears in the DOM
+  useEffect(() => {
+    const preview = pendingPreviewRef.current;
+    if (!analyzed || !preview) return;
+    pendingPreviewRef.current = null;
+
+    const frame = iframeRef.current;
+    if (!frame) return;
+
+    frame.srcdoc = preview.html;
+    frame.onload = () => {
+      previewReadyRef.current = true;
+      if (frame.contentDocument?.body) {
+        const cleanResult = generateCleanHtmlFromPreview(
+          frame.contentDocument.body, linksRef.current, keepMapRef.current, preview.placeholders
+        );
+        setCleanHtml(cleanResult.html);
+        setTargetSelfCount(cleanResult.targetSelfCount);
+      }
+    };
+  }, [analyzed, links]);
+
   // Recalculate clean HTML whenever keepMap changes
   useEffect(() => {
     if (!analyzed || links.length === 0) return;
@@ -105,25 +128,11 @@ export default function LinkCleaner() {
     setActiveTab('preview');
     setIsClean(removed === 0);
 
-    // Generate preview
+    // Generate preview (deferred to useEffect so iframe is in the DOM)
     previewReadyRef.current = false;
     const preview = generatePreviewHtml(html, result.links, autoKeep);
     placeholdersRef.current = preview.placeholders;
-
-    if (iframeRef.current) {
-      iframeRef.current.srcdoc = preview.html;
-      iframeRef.current.onload = () => {
-        previewReadyRef.current = true;
-        if (iframeRef.current?.contentDocument?.body) {
-          const cleanResult = generateCleanHtmlFromPreview(
-            iframeRef.current.contentDocument.body,
-            result.links, autoKeep, preview.placeholders
-          );
-          setCleanHtml(cleanResult.html);
-          setTargetSelfCount(cleanResult.targetSelfCount);
-        }
-      };
-    }
+    pendingPreviewRef.current = preview;
 
     // Initial clean HTML (before preview loads)
     const cleanResult = generateCleanHtml(html, result.links, autoKeep);
@@ -181,6 +190,7 @@ export default function LinkCleaner() {
     setActiveTab('preview');
     previewReadyRef.current = false;
     placeholdersRef.current = [];
+    pendingPreviewRef.current = null;
   }, []);
 
   const handleNextArticle = useCallback((e) => {
