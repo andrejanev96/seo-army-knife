@@ -395,10 +395,7 @@ export function generatePreviewHtml(originalHtml, links, keepMap) {
     a[data-link-id]:hover{opacity:0.7;transition:opacity 0.1s;}
     .srlc-hint{background:#f0f1f5;padding:6px 12px;border-radius:6px;font-size:11px;color:#6c7281;margin-bottom:16px;line-height:1.4;}
     .srlc-hint strong{color:#4f46e5;}
-  </style></head><body contenteditable="true">
-  <div class="srlc-hint" contenteditable="false">Click <strong style="background:#bbf7d0;padding:1px 4px;border-radius:3px;">green</strong> or <strong style="background:#fecaca;padding:1px 4px;border-radius:3px;text-decoration:line-through;color:#991b1b;">red</strong> links to toggle. Text around links is editable.</div>
-  ${bodyHtml}
-  <script>
+  </style></head><body contenteditable="true"><div class="srlc-hint" contenteditable="false">Click <strong style="background:#bbf7d0;padding:1px 4px;border-radius:3px;">green</strong> or <strong style="background:#fecaca;padding:1px 4px;border-radius:3px;text-decoration:line-through;color:#991b1b;">red</strong> links to toggle. Text around links is editable.</div>${bodyHtml}<script>
     document.addEventListener('click', function(e) {
       var link = e.target.closest('a[data-link-id]');
       if (link) {
