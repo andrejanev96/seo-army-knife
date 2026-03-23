@@ -294,9 +294,6 @@ export default function LinkCleaner() {
               {articleTitle ? `${articleTitle}  \u00B7  ` : ''}
               {htmlInput.length.toLocaleString()} chars, {stats.totalLinks} links found
             </span>
-            <button className="lc__btn lc__btn--next" onClick={handleNextArticle}>
-              Next Article
-            </button>
             <span className="lc__collapse-toggle" onClick={() => setInputCollapsed(false)}>
               Show
             </span>
@@ -420,13 +417,13 @@ export default function LinkCleaner() {
               {totalChanges > 0 && <span className="lc__tab-badge">{totalChanges}</span>}
             </div>
             <div className="lc__tab-actions">
-              <button className="lc__btn lc__btn--success lc__btn--sm" onClick={handleCopy}>
+              <button className="lc__btn lc__btn--success" onClick={handleCopy}>
                 Copy
               </button>
-              <button className="lc__btn lc__btn--secondary lc__btn--sm" onClick={handleAutoStrip}>
+              <button className="lc__btn lc__btn--secondary" onClick={handleAutoStrip}>
                 Auto-Strip
               </button>
-              <button className="lc__btn lc__btn--secondary lc__btn--sm" onClick={handleKeepAll}>
+              <button className="lc__btn lc__btn--secondary" onClick={handleKeepAll}>
                 Keep All
               </button>
             </div>
@@ -511,6 +508,12 @@ export default function LinkCleaner() {
                 </>
               )}
             </div>
+          </div>
+
+          <div className="lc__bottom-actions">
+            <button className="lc__btn lc__btn--primary" onClick={handleNextArticle}>
+              Next Article
+            </button>
           </div>
         </div>
       )}
