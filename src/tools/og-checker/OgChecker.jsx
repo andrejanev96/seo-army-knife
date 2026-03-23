@@ -237,7 +237,7 @@ export default function OgChecker() {
           <div className="og__section">
             <h3 className="og__section-title">Technical OG Tag Inspector</h3>
             <p className="og__section-desc">
-              Inspect and refine your OG title, description, and image. Changes update the previews above in real time.
+              Inspect your OG title, description, and image before publishing.
             </p>
 
             <div className="og__inspector">
@@ -247,7 +247,7 @@ export default function OgChecker() {
                   type="text"
                   className="og__field-input"
                   value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
+                  readOnly
                 />
                 <div className="og__field-meta">
                   <span className="og__char-count" style={{ color: titleColor }}>
@@ -262,7 +262,7 @@ export default function OgChecker() {
                 <textarea
                   className="og__field-textarea"
                   value={editDesc}
-                  onChange={(e) => setEditDesc(e.target.value)}
+                  readOnly
                   rows={3}
                 />
                 <div className="og__field-meta">
