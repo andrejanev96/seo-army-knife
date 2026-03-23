@@ -161,9 +161,9 @@
 
 /* ── Buttons ── */
 .lc__btn {
-  padding: 9px 20px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
@@ -506,7 +506,12 @@
 .lc__bottom-actions {
   display: flex;
   justify-content: center;
-  padding: 16px 0 4px;
+  padding: 20px 0;
+}
+
+.lc__bottom-actions .lc__btn {
+  padding: 12px 36px;
+  font-size: 0.95rem;
 }
 
 /* ── Scrollbar ── */

@@ -510,11 +510,15 @@ export default function LinkCleaner() {
             </div>
           </div>
 
-          <div className="lc__bottom-actions">
-            <button className="lc__btn lc__btn--primary" onClick={handleNextArticle}>
-              Next Article
-            </button>
-          </div>
+        </div>
+      )}
+
+      {/* Next Article - below everything */}
+      {analyzed && (
+        <div className="lc__bottom-actions">
+          <button className="lc__btn lc__btn--primary" onClick={handleNextArticle}>
+            Next Article
+          </button>
         </div>
       )}
     </div>

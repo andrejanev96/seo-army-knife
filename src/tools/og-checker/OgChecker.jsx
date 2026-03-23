@@ -110,6 +110,13 @@ export default function OgChecker() {
         </button>
       </div>
 
+      {/* Loading Bar */}
+      {loading && (
+        <div className="og__loading-bar">
+          <div className="og__loading-bar-inner" />
+        </div>
+      )}
+
       {/* Issues */}
       {issues.length > 0 && (
         <div className="og__issues">

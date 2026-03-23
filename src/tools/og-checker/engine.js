@@ -1,5 +1,21 @@
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
+async function fetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return res;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw err;
+  }
+}
+
 export async function fetchPageHtml(url) {
   let normalized = url.trim();
   if (!/^https?:\/\//i.test(normalized)) {
@@ -12,13 +28,24 @@ export async function fetchPageHtml(url) {
     throw new Error('Invalid URL');
   }
 
-  const res = await fetch(CORS_PROXY + encodeURIComponent(normalized), {
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch (${res.status})`);
+  const target = CORS_PROXY + encodeURIComponent(normalized);
+
+  // Try up to 2 times (initial + 1 retry on timeout)
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchWithTimeout(target, 20000);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch (${res.status})`);
+      }
+      return { html: await res.text(), finalUrl: normalized };
+    } catch (err) {
+      lastError = err;
+      if (err.message !== 'Request timed out' || attempt === 1) throw err;
+      // Retry once on timeout
+    }
   }
-  return { html: await res.text(), finalUrl: normalized };
+  throw lastError;
 }
 
 export function parseMetaTags(html, baseUrl) {
