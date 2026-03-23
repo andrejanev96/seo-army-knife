@@ -2,12 +2,14 @@ import reportHighlightsConvert from './report-highlights-convert';
 import reportHighlightsCreate from './report-highlights-create';
 import tableBeautifier from './table-beautifier';
 import linkCleaner from './link-cleaner';
+import ogChecker from './og-checker';
 
 const tools = [
   reportHighlightsConvert,
   reportHighlightsCreate,
   tableBeautifier,
   linkCleaner,
+  ogChecker,
 ];
 
 export default tools;
