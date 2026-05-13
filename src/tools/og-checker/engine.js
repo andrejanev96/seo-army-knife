@@ -1,5 +1,14 @@
-// Public CORS proxies tried in order. If one fails or hangs, the next is used.
+// Proxies tried in order. The optional Cloudflare Worker (deployed from
+// the worker/ directory, address set via VITE_OG_PROXY_URL) is preferred —
+// it sends rotating social-crawler User-Agents and gets through most CF
+// sites. Falls back to the three public CORS proxies if the Worker isn't
+// configured, errors, or 502s.
+const WORKER_URL = (import.meta.env?.VITE_OG_PROXY_URL || '').replace(/\/$/, '');
+
 const PROXIES = [
+  ...(WORKER_URL
+    ? [{ name: 'worker', build: (u) => `${WORKER_URL}/?url=${encodeURIComponent(u)}` }]
+    : []),
   { name: 'allorigins', build: (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
   { name: 'corsproxy',  build: (u) => `https://corsproxy.io/?${encodeURIComponent(u)}` },
   { name: 'codetabs',   build: (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}` },
