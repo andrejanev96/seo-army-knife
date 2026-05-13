@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useToast } from '../../context/ToastContext';
+import { useToast } from '../../context/useToast';
 import {
   analyzeHtml,
   computeAutoStrip,
@@ -16,6 +16,7 @@ export default function LinkCleaner() {
   const previewReadyRef = useRef(false);
   const placeholdersRef = useRef([]);
   const pendingPreviewRef = useRef(null);
+  const stampedHtmlRef = useRef('');
 
   // Input state
   const [domain, setDomain] = useState('');
@@ -37,19 +38,22 @@ export default function LinkCleaner() {
   // UI state
   const [activeTab, setActiveTab] = useState('preview');
 
-  // Refs for stable callbacks
+  // Refs for stable callbacks — populated via effect so we don't write to a
+  // ref during render (which the react-hooks lint rule disallows).
   const linksRef = useRef(links);
-  linksRef.current = links;
   const keepMapRef = useRef(keepMap);
-  keepMapRef.current = keepMap;
+  const analyzeRef = useRef(() => {});
+
+  useEffect(() => { linksRef.current = links; });
+  useEffect(() => { keepMapRef.current = keepMap; });
 
   // Toggle a single link keep/remove
   const toggleLink = useCallback((id) => {
-    const link = linksRef.current.find(l => l.id === id);
+    const link = linksRef.current.find((l) => l.id === id);
     if (!link || link.isImageLink || link.isCtaLink) return;
 
     const newKeep = !keepMapRef.current[id];
-    setKeepMap(prev => ({ ...prev, [id]: newKeep }));
+    setKeepMap((prev) => ({ ...prev, [id]: newKeep }));
 
     const frame = iframeRef.current;
     if (frame?.contentWindow) {
@@ -57,10 +61,11 @@ export default function LinkCleaner() {
     }
   }, []);
 
-  // Listen for iframe toggle messages
+  // Listen for iframe toggle messages — only from our own iframe.
   useEffect(() => {
     const handler = (e) => {
-      if (e.data && e.data.type === 'srlc-toggle') {
+      if (e.source !== iframeRef.current?.contentWindow) return;
+      if (e.data?.type === 'srlc-toggle' && typeof e.data.id === 'number') {
         toggleLink(e.data.id);
       }
     };
@@ -82,7 +87,7 @@ export default function LinkCleaner() {
       previewReadyRef.current = true;
       if (frame.contentDocument?.body) {
         const cleanResult = generateCleanHtmlFromPreview(
-          frame.contentDocument.body, linksRef.current, keepMapRef.current, preview.placeholders
+          frame.contentDocument.body, keepMapRef.current, preview.placeholders
         );
         setCleanHtml(cleanResult.html);
         setTargetSelfCount(cleanResult.targetSelfCount);
@@ -97,16 +102,16 @@ export default function LinkCleaner() {
     const frame = iframeRef.current;
     if (previewReadyRef.current && frame?.contentDocument?.body) {
       const result = generateCleanHtmlFromPreview(
-        frame.contentDocument.body, links, keepMap, placeholdersRef.current
+        frame.contentDocument.body, keepMap, placeholdersRef.current
       );
       setCleanHtml(result.html);
       setTargetSelfCount(result.targetSelfCount);
-    } else {
-      const result = generateCleanHtml(htmlInput, links, keepMap);
+    } else if (stampedHtmlRef.current) {
+      const result = generateCleanHtml(stampedHtmlRef.current, keepMap, placeholdersRef.current);
       setCleanHtml(result.html);
       setTargetSelfCount(result.targetSelfCount);
     }
-  }, [keepMap, analyzed, links, htmlInput]);
+  }, [keepMap, analyzed, links]);
 
   // Analyze handler
   const handleAnalyze = useCallback(() => {
@@ -115,7 +120,10 @@ export default function LinkCleaner() {
 
     const result = analyzeHtml(html, domain);
     const autoKeep = computeAutoStrip(result.links, result.groups);
-    const removed = result.links.filter(l => !autoKeep[l.id]).length;
+    const removed = result.links.filter((l) => !autoKeep[l.id]).length;
+
+    stampedHtmlRef.current = result.stampedHtml;
+    placeholdersRef.current = result.placeholders;
 
     setLinks(result.links);
     setGroups(result.groups);
@@ -130,49 +138,45 @@ export default function LinkCleaner() {
 
     // Generate preview (deferred to useEffect so iframe is in the DOM)
     previewReadyRef.current = false;
-    const preview = generatePreviewHtml(html, result.links, autoKeep);
-    placeholdersRef.current = preview.placeholders;
+    const preview = generatePreviewHtml(result.stampedHtml, result.links, autoKeep, result.placeholders);
     pendingPreviewRef.current = preview;
 
     // Initial clean HTML (before preview loads)
-    const cleanResult = generateCleanHtml(html, result.links, autoKeep);
+    const cleanResult = generateCleanHtml(result.stampedHtml, autoKeep, result.placeholders);
     setCleanHtml(cleanResult.html);
     setTargetSelfCount(cleanResult.targetSelfCount);
 
     if (removed === 0) {
-      showToast('\u2705 Article is clean \u2014 no redundant links!');
+      showToast('✅ Article is clean — no redundant links!');
     } else {
-      showToast(`${result.stats.totalLinks} links, ${result.stats.uniqueUrls} unique URLs \u2014 ${removed} marked for removal`);
+      showToast(`${result.stats.totalLinks} links, ${result.stats.uniqueUrls} unique URLs — ${removed} marked for removal`);
     }
   }, [htmlInput, domain, showToast]);
+
+  useEffect(() => { analyzeRef.current = handleAnalyze; });
+
+  const broadcastKeepMap = useCallback((newKeep) => {
+    const frame = iframeRef.current;
+    if (!frame?.contentWindow) return;
+    const updates = linksRef.current
+      .filter((l) => !l.isImageLink && !l.isCtaLink)
+      .map((l) => ({ id: l.id, keep: newKeep[l.id] !== false }));
+    frame.contentWindow.postMessage({ type: 'srlc-update-all', updates }, '*');
+  }, []);
 
   const handleAutoStrip = useCallback(() => {
     const newKeep = computeAutoStrip(links, groups);
     setKeepMap(newKeep);
-
-    const frame = iframeRef.current;
-    if (frame?.contentWindow) {
-      const updates = links
-        .filter(l => !l.isImageLink && !l.isCtaLink)
-        .map(l => ({ id: l.id, keep: newKeep[l.id] }));
-      frame.contentWindow.postMessage({ type: 'srlc-update-all', updates }, '*');
-    }
+    broadcastKeepMap(newKeep);
     showToast('Auto-strip applied');
-  }, [links, groups, showToast]);
+  }, [links, groups, broadcastKeepMap, showToast]);
 
   const handleKeepAll = useCallback(() => {
     const newKeep = computeKeepAll(links);
     setKeepMap(newKeep);
-
-    const frame = iframeRef.current;
-    if (frame?.contentWindow) {
-      const updates = links
-        .filter(l => !l.isImageLink && !l.isCtaLink)
-        .map(l => ({ id: l.id, keep: true }));
-      frame.contentWindow.postMessage({ type: 'srlc-update-all', updates }, '*');
-    }
+    broadcastKeepMap(newKeep);
     showToast('All links set to keep');
-  }, [links, showToast]);
+  }, [links, broadcastKeepMap, showToast]);
 
   const handleReset = useCallback(() => {
     setHtmlInput('');
@@ -191,6 +195,7 @@ export default function LinkCleaner() {
     previewReadyRef.current = false;
     placeholdersRef.current = [];
     pendingPreviewRef.current = null;
+    stampedHtmlRef.current = '';
   }, []);
 
   const handleNextArticle = useCallback((e) => {
@@ -204,14 +209,14 @@ export default function LinkCleaner() {
     const frame = iframeRef.current;
     if (previewReadyRef.current && frame?.contentDocument?.body) {
       const result = generateCleanHtmlFromPreview(
-        frame.contentDocument.body, links, keepMap, placeholdersRef.current
+        frame.contentDocument.body, keepMap, placeholdersRef.current
       );
       setCleanHtml(result.html);
       setTargetSelfCount(result.targetSelfCount);
       return result.html;
     }
     return cleanHtml;
-  }, [links, keepMap, cleanHtml]);
+  }, [keepMap, cleanHtml]);
 
   const handleCopy = useCallback(() => {
     const text = refreshCleanHtml();
@@ -236,26 +241,26 @@ export default function LinkCleaner() {
     if (tab === 'clean') refreshCleanHtml();
   }, [refreshCleanHtml]);
 
-  // Keyboard shortcut
+  // Ctrl/Cmd+Enter to analyze. Bound once via ref.
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
-        handleAnalyze();
+        analyzeRef.current();
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [handleAnalyze]);
+  }, []);
 
   // Derived state
-  const kept = links.filter(l => keepMap[l.id]).length;
-  const removed = links.filter(l => !keepMap[l.id]).length;
-  const removedLinks = links.filter(l => !keepMap[l.id]);
+  const kept = links.filter((l) => keepMap[l.id] !== false).length;
+  const removed = links.filter((l) => keepMap[l.id] === false).length;
+  const removedLinks = links.filter((l) => keepMap[l.id] === false);
   const totalChanges = removedLinks.length + targetSelfCount;
 
   const removedByUrl = {};
-  removedLinks.forEach(l => {
+  removedLinks.forEach((l) => {
     if (!removedByUrl[l.normalizedHref]) removedByUrl[l.normalizedHref] = [];
     removedByUrl[l.normalizedHref].push(l);
   });
@@ -286,17 +291,13 @@ export default function LinkCleaner() {
       {/* Input Section */}
       <div className="lc__input-section">
         {inputCollapsed && (
-          <div className="lc__collapse-bar">
-            <span className="lc__collapse-label" onClick={() => setInputCollapsed(false)}>
-              HTML Input
-            </span>
-            <span className="lc__collapse-summary" onClick={() => setInputCollapsed(false)}>
-              {articleTitle ? `${articleTitle}  \u00B7  ` : ''}
+          <div className="lc__collapse-bar" onClick={() => setInputCollapsed(false)}>
+            <span className="lc__collapse-label">HTML Input</span>
+            <span className="lc__collapse-summary">
+              {articleTitle ? `${articleTitle}  ·  ` : ''}
               {htmlInput.length.toLocaleString()} chars, {stats.totalLinks} links found
             </span>
-            <span className="lc__collapse-toggle" onClick={() => setInputCollapsed(false)}>
-              Show
-            </span>
+            <span className="lc__collapse-toggle">Show</span>
           </div>
         )}
         <div className={`lc__input-body ${inputCollapsed ? 'lc__input-body--collapsed' : ''}`}>
@@ -306,6 +307,7 @@ export default function LinkCleaner() {
             onChange={(e) => setHtmlInput(e.target.value)}
             placeholder="Paste your article HTML here..."
             spellCheck={false}
+            aria-label="HTML to analyze"
           />
           <div className="lc__input-actions">
             <button className="lc__btn lc__btn--primary" onClick={handleAnalyze}>
@@ -372,7 +374,7 @@ export default function LinkCleaner() {
       {/* Clean Article Banner */}
       {analyzed && isClean && (
         <div className="lc__clean-banner">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" />
           </svg>
           This article is clean &mdash; no redundant links found!
@@ -381,16 +383,21 @@ export default function LinkCleaner() {
 
       {/* Warnings */}
       {warnings.length > 0 && (
-        <div className="lc__warnings">
-          {warnings.map((w, i) => {
-            const icons = { broken: '\u26A0', 'image-only': '\uD83D\uDDBC', heading: '\u24D8', density: '\u25CF' };
-            return (
-              <div key={i} className="lc__warning">
-                {icons[w.type] || '\u26A0'} {w.message}
-              </div>
-            );
-          })}
-        </div>
+        <details className="lc__warnings" open>
+          <summary className="lc__warnings-summary">
+            {warnings.length} warning{warnings.length !== 1 ? 's' : ''}
+          </summary>
+          <div className="lc__warnings-list">
+            {warnings.map((w, i) => {
+              const icons = { broken: '⚠', 'image-only': '🖼', heading: 'ⓘ', density: '●' };
+              return (
+                <div key={`${w.type}:${i}`} className="lc__warning">
+                  <span aria-hidden="true">{icons[w.type] || '⚠'}</span> {w.message}
+                </div>
+              );
+            })}
+          </div>
+        </details>
       )}
 
       {/* Main Output */}
@@ -425,6 +432,9 @@ export default function LinkCleaner() {
               </button>
               <button className="lc__btn lc__btn--secondary" onClick={handleKeepAll}>
                 Keep All
+              </button>
+              <button className="lc__btn lc__btn--primary" onClick={handleNextArticle}>
+                Next Article
               </button>
             </div>
           </div>
@@ -467,7 +477,7 @@ export default function LinkCleaner() {
               ) : (
                 <>
                   <div className="lc__changes-summary">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6" />
                     </svg>
                     {totalChanges} change{totalChanges !== 1 ? 's' : ''}:{' '}
@@ -496,7 +506,7 @@ export default function LinkCleaner() {
                           {urlLinks.length} removal{urlLinks.length > 1 ? 's' : ''}
                         </span>
                       </div>
-                      {urlLinks.map(l => (
+                      {urlLinks.map((l) => (
                         <div key={l.id} className="lc__change-item">
                           <code>&lt;a href=&quot;...&quot;&gt;</code> {l.anchorText}{' '}
                           <code>&lt;/a&gt;</code> &rarr; <strong>{l.anchorText}</strong>
@@ -509,16 +519,6 @@ export default function LinkCleaner() {
               )}
             </div>
           </div>
-
-        </div>
-      )}
-
-      {/* Next Article - below everything */}
-      {analyzed && (
-        <div className="lc__bottom-actions">
-          <button className="lc__btn lc__btn--primary" onClick={handleNextArticle}>
-            Next Article
-          </button>
         </div>
       )}
     </div>
