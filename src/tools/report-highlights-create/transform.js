@@ -12,12 +12,12 @@ export function create(text) {
   if (headerMatch) {
     intro = headerMatch[1].trim();
   } else {
-    intro = firstLine.replace(/^[●•*\-]\s*/, '').trim();
+    intro = firstLine.replace(/^[●•*-]\s*/, '').trim();
   }
 
   const items = lines.slice(headerMatch ? 1 : 0);
   const bulletItems = items
-    .map((l) => l.replace(/^[●•*\-]\s*/, '').trim())
+    .map((l) => l.replace(/^[●•*-]\s*/, '').trim())
     .filter((l) => l.length > 0);
 
   if (bulletItems.length === 0) {
