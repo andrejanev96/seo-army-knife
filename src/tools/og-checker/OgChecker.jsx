@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '../../context/useToast';
+import { SeverityIcon } from '../../components/icons';
 import {
   fetchPageHtml,
   parseMetaTags,
@@ -30,6 +31,7 @@ export default function OgChecker() {
   const [activePlatform, setActivePlatform] = useState('facebook');
   const [imgError, setImgError] = useState(false);
   const [checkedUrl, setCheckedUrl] = useState('');
+  const [fetchError, setFetchError] = useState('');
 
   // Ref-based handle so the document-level keyboard shortcut effect only binds
   // once and still calls the latest handler when state changes.
@@ -44,6 +46,7 @@ export default function OgChecker() {
     setIssues([]);
     setCode('');
     setImgError(false);
+    setFetchError('');
 
     try {
       const { html, finalUrl } = await fetchPageHtml(trimmed);
@@ -57,7 +60,10 @@ export default function OgChecker() {
       setCheckedUrl(finalUrl);
       showToast('Tags loaded');
     } catch (err) {
-      showToast(err.message || 'Could not fetch URL', true);
+      const msg = err.message || 'Could not fetch URL';
+      setFetchError(msg);
+      setCheckedUrl(trimmed);
+      showToast('Fetch failed — see details below', true);
     } finally {
       setLoading(false);
     }
@@ -136,6 +142,37 @@ export default function OgChecker() {
         </div>
       )}
 
+      {/* Fetch error (persistent) */}
+      {fetchError && (
+        <div className="og__fetch-error" role="alert">
+          <div className="og__fetch-error-title">Couldn’t inspect this URL</div>
+          <div className="og__fetch-error-message">{fetchError}</div>
+          {/^Site is protected/i.test(fetchError) && (
+            <div className="og__fetch-error-actions">
+              <span className="og__fetch-error-hint">Try the platform’s official tool — they fetch from the inside:</span>
+              <a
+                className="og__fetch-error-link"
+                href={`https://developers.facebook.com/tools/debug/?q=${encodeURIComponent(checkedUrl)}`}
+                target="_blank"
+                rel="noreferrer"
+              >Facebook Debugger ↗</a>
+              <a
+                className="og__fetch-error-link"
+                href={`https://www.linkedin.com/post-inspector/inspect/${encodeURIComponent(checkedUrl)}`}
+                target="_blank"
+                rel="noreferrer"
+              >LinkedIn Post Inspector ↗</a>
+              <a
+                className="og__fetch-error-link"
+                href={`https://search.google.com/test/rich-results?url=${encodeURIComponent(checkedUrl)}`}
+                target="_blank"
+                rel="noreferrer"
+              >Google Rich Results ↗</a>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Issues */}
       {issues.length > 0 && (
         <div className="og__issues">
@@ -145,9 +182,7 @@ export default function OgChecker() {
               key={`${issue.severity}:${issue.message}`}
               className={`og__issue og__issue--${issue.severity}`}
             >
-              <span className="og__issue-icon" aria-hidden="true">
-                {issue.severity === 'error' ? '✖' : issue.severity === 'warning' ? '⚠' : 'ⓘ'}
-              </span>
+              <SeverityIcon severity={issue.severity} size={14} className="og__issue-icon" />
               {issue.message}
             </div>
           ))}
@@ -175,7 +210,7 @@ export default function OgChecker() {
               ))}
             </div>
 
-            <div className="og__preview-area">
+            <div className={`og__preview-area og__preview-area--${activePlatform}`}>
               {activePlatform === 'facebook' && (
                 <div className="og__card og__card--facebook">
                   {previewImage && !imgError && (

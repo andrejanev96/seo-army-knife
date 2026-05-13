@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseMetaTags,
   detectIssues,
+  detectBotChallenge,
   generateMetaTagsCode,
   getDomain,
   lengthStatus,
@@ -136,6 +137,30 @@ describe('generateMetaTagsCode', () => {
     expect(code).toContain('&amp;');
     expect(code).toContain('&lt;');
     expect(code).toContain('&quot;');
+  });
+});
+
+describe('detectBotChallenge', () => {
+  it('catches Cloudflare interstitial by script marker', () => {
+    const html = '<html><head><script src="/cdn-cgi/challenge-platform/h/b/x.js"></script></head></html>';
+    expect(detectBotChallenge(html)).toBe('Cloudflare');
+  });
+
+  it('catches "Just a moment..." titles', () => {
+    expect(detectBotChallenge('<title>Just a moment...</title>')).toBe('Cloudflare-style');
+  });
+
+  it('catches AWS WAF challenge', () => {
+    expect(detectBotChallenge('<div id="awswafcaptcha"></div>')).toBe('AWS WAF');
+  });
+
+  it('returns null for real OG-tagged pages', () => {
+    const html = '<html><head><meta property="og:title" content="Real Page"></head></html>';
+    expect(detectBotChallenge(html)).toBeNull();
+  });
+
+  it('returns null for an unrelated empty page', () => {
+    expect(detectBotChallenge('<html><body>hello</body></html>')).toBeNull();
   });
 });
 

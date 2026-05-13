@@ -28,6 +28,46 @@ function describeError(err) {
   return err?.message || 'request failed';
 }
 
+// Public proxies often get served bot-challenge pages instead of the real
+// content. The HTTP status is 200 so res.ok() doesn't notice — we have to
+// pattern-match the body. Returns a label for the gate or null if the HTML
+// looks like a real page.
+export function detectBotChallenge(html) {
+  if (!html) return null;
+  const lower = html.toLowerCase();
+
+  // Cloudflare "Just a moment..." interstitial
+  if (lower.includes('cf-browser-verification') ||
+      lower.includes('cdn-cgi/challenge-platform') ||
+      lower.includes('challenges.cloudflare.com') ||
+      (lower.includes('<title>just a moment') && lower.includes('cloudflare'))) {
+    return 'Cloudflare';
+  }
+  // Generic "Just a moment..." with no other signal — still likely a bot wall
+  if (/<title>\s*just a moment/i.test(html)) {
+    return 'Cloudflare-style';
+  }
+  // AWS WAF
+  if (lower.includes('awswafcaptcha') || lower.includes('aws waf')) {
+    return 'AWS WAF';
+  }
+  // PerimeterX / HUMAN
+  if (lower.includes('px-captcha') || lower.includes('_pxcaptcha')) {
+    return 'PerimeterX';
+  }
+  // Akamai bot manager
+  if (lower.includes('akam/') && lower.includes('access denied')) {
+    return 'Akamai';
+  }
+  // hCaptcha / reCAPTCHA full-page challenge
+  if ((lower.includes('h-captcha') || lower.includes('hcaptcha.com/captcha')) &&
+      !lower.includes('<meta property="og:')) {
+    return 'hCaptcha';
+  }
+
+  return null;
+}
+
 export async function fetchPageHtml(url) {
   let normalized = url.trim();
   if (!/^https?:\/\//i.test(normalized)) normalized = 'https://' + normalized;
@@ -38,11 +78,19 @@ export async function fetchPageHtml(url) {
   }
 
   const failures = [];
+  let lastChallenge = null;
   for (const proxy of PROXIES) {
     try {
       const html = await fetchWithTimeout(proxy.build(normalized), FETCH_TIMEOUT_MS);
       if (!html || html.length < 50) {
         failures.push(`${proxy.name}: empty response`);
+        continue;
+      }
+      const challenge = detectBotChallenge(html);
+      if (challenge) {
+        // Try the next proxy — a different exit IP may pass the challenge.
+        failures.push(`${proxy.name}: blocked by ${challenge}`);
+        lastChallenge = challenge;
         continue;
       }
       return { html, finalUrl: normalized };
@@ -51,6 +99,12 @@ export async function fetchPageHtml(url) {
     }
   }
 
+  if (lastChallenge) {
+    throw new Error(
+      `Site is protected by ${lastChallenge}. All CORS proxies were challenged. ` +
+      `Try a social platform's official debugger (e.g. Facebook Sharing Debugger) instead.`
+    );
+  }
   throw new Error(`Could not fetch URL (${failures.join('; ')})`);
 }
 
