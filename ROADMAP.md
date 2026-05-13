@@ -16,6 +16,19 @@ The connective tissue that makes every future tool cheaper to build.
 - **Worker generalization** — `worker/index.js` now supports `?mode=raw` (default) and `?mode=head` (status + redirect chain). Additive, non-breaking; the deployed worker keeps its `og-fetch` name in `wrangler.toml` to avoid coordinated env-var churn. `VITE_CRAWLER_PROXY_URL` is the new canonical env var; `VITE_OG_PROXY_URL` is still honored.
 - **Current Draft buffer** — `CurrentDraftContext` + `useCurrentDraft()` + the `CurrentDraftBar` strip above every tool. Article-scoped, localStorage-backed. OG Checker (HTML mode) and Link Cleaner both auto-save on submit and offer a "Load from current draft" button.
 
+## ✅ Brand pass — ammo.com identity (SHIPPED)
+
+Chrome dressed in the AC Brand Style Guide; tool internals inherit via shared CSS vars.
+
+- **Palette** — Revolutionary Black backdrop ramp (gray 75–500), **gold #bf9400 as PRIMARY** action color (hover #d4a017), red #99161d as SECONDARY/label-chip, light-grey text on dark. Variables live in `src/App.css` so future tools follow automatically.
+- **Logo** — inline `<AmmoShieldIcon>` in `src/components/icons.jsx` (chevron variant, brand-guide-approved for nav at ≥16px). No external image dep.
+- **Wordmark** — red `<span class="brand-chip">SEO</span>` next to "Army Knife" in Roboto Light. The `.brand-chip` utility class (defined in `App.css`) is the reusable label-chip pattern for any future section/category tag.
+- **Typography** — Roboto loaded via Google Fonts in `index.html` (300/400/500/700 weights). Heading sizes follow the brand guide (H1 Light 48px, H2 Light 34px, etc.).
+- **Animations** — pure CSS keyframes (`sak-fade-in`, `sak-fade-up`, `sak-slide-down`, `sak-shimmer`, `sak-pulse-gold`) defined globally in `App.css`. `ToolPage` re-keys on `tool.id` so each route change plays the fade-up entrance. Sidebar nav has a sliding gold edge accent on hover/active. `prefers-reduced-motion` collapses every animation to 0.01ms. Zero new runtime deps — bundle held at 90 KB JS / 7 KB CSS gzipped (vs. ~140 KB the GSAP option would have cost).
+- **Audit hygiene** — `npm audit` reports **0 vulnerabilities** (was 2 moderate + 3 high; all dev/build-time deps, patched without `--force`).
+
+The brand convention in `CLAUDE.md` was inverted in this pass: previously *"never apply ammo.com's dark/gold/red to the toolkit chrome"*; now *"toolkit chrome IS the ammo.com brand."* New tools should default to the dark surfaces + gold primary + red secondary pattern.
+
 ---
 
 ## ▶ Weeks 3–4 — SERP Snippet Preview + Schema Markup Generator
@@ -192,7 +205,7 @@ Small, not blocking new tools, worth addressing opportunistically:
 - **TypeScript migration.** Link-cleaner's `links`/`groups`/`keepMap` shape-heavy code is the natural starting point.
 - **CI workflow audit.** `.github/workflows/` exists — verify it runs `npm test` + `npm run lint` + `npm run build` on PRs.
 - **Tighten standalone-tool descriptions.** OG-checker and link-cleaner have two-paragraph descriptions in their `index.js`; report-highlights' are crisp one-liners. Bring everything to one-sentence-in-sidebar, detail-in-tool-body.
-- **`5 vulnerabilities` from `npm install`.** Run `npm audit fix` after merging the infrastructure PR.
+- **Brand-guide pages 21+** (Imagery, Icon Usage, Website Assets, Social Media) weren't read during the brand pass. If they tighten conventions further (button radii, icon-padding rules), fold them in next session.
 - **Worker rename to `crawler-proxy`.** Currently deferred — do this when there's a coordinated reason (e.g. a new Wrangler project, or env-var migration is already happening).
 
 ---
