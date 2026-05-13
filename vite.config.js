@@ -1,8 +1,14 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+/// <reference types="vitest" />
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   base: '/seo-army-knife/',
-})
+  test: {
+    environment: 'happy-dom',
+    include: ['src/**/*.test.{js,jsx}'],
+    globals: true,
+  },
+});
