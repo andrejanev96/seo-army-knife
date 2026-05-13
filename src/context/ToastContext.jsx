@@ -1,7 +1,6 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Toast from '../components/Toast';
-
-const ToastContext = createContext(null);
+import { ToastContext } from './toast-context';
 
 export function ToastProvider({ children }) {
   const [toast, setToast] = useState({ message: '', isError: false, visible: false });
@@ -21,8 +20,4 @@ export function ToastProvider({ children }) {
       <Toast message={toast.message} isError={toast.isError} visible={toast.visible} />
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  return useContext(ToastContext);
 }
