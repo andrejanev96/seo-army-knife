@@ -456,34 +456,25 @@
   margin-bottom: 6px;
 }
 
-.og__field-input {
-  width: 100%;
+.og__field-value {
+  margin: 0;
   padding: 8px 12px;
-  border: 1px solid #e9ecf0;
-  border-radius: 8px;
   font-size: 0.85rem;
-  font-family: inherit;
-  outline: none;
-  background: #f1f5f9;
+  line-height: 1.5;
   color: #1e293b;
-  cursor: default;
-  pointer-events: none;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 3px solid #cbd5e1;
+  word-break: break-word;
 }
 
-.og__field-textarea {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #e9ecf0;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-family: inherit;
-  outline: none;
-  resize: none;
-  line-height: 1.5;
-  background: #f1f5f9;
-  color: #1e293b;
-  cursor: default;
-  pointer-events: none;
+.og__field-value--long {
+  min-height: 3em;
+}
+
+.og__field-empty {
+  color: #94a3b8;
+  font-style: italic;
 }
 
 .og__field-meta {
@@ -496,6 +487,11 @@
   font-size: 0.72rem;
   font-weight: 600;
 }
+
+.og__char-count--ok      { color: var(--color-success, #059669); }
+.og__char-count--warning { color: var(--color-warning, #b45309); }
+.og__char-count--error   { color: var(--color-danger,  #dc2626); }
+.og__char-count--empty   { color: var(--color-muted,   #94a3b8); }
 
 .og__char-rec {
   font-size: 0.72rem;
@@ -562,11 +558,10 @@
   letter-spacing: 0.04em;
 }
 
-.og__code-pre {
+.og__code-body {
   padding: 14px 0;
-  margin: 0;
   overflow-x: auto;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-family: var(--font-mono, 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace);
   font-size: 0.78rem;
   line-height: 1.7;
 }

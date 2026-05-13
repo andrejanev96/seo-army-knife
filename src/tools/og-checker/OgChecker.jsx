@@ -1,6 +1,15 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useToast } from '../../context/ToastContext';
-import { fetchPageHtml, parseMetaTags, detectIssues, generateMetaTagsCode, getDomain } from './engine';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useToast } from '../../context/useToast';
+import {
+  fetchPageHtml,
+  parseMetaTags,
+  detectIssues,
+  generateMetaTagsCode,
+  getDomain,
+  lengthStatus,
+  TITLE_LENGTH,
+  DESC_LENGTH,
+} from './engine';
 import './OgChecker.css';
 
 const PLATFORMS = [
@@ -19,10 +28,12 @@ export default function OgChecker() {
   const [issues, setIssues] = useState([]);
   const [code, setCode] = useState('');
   const [activePlatform, setActivePlatform] = useState('facebook');
-  const [editTitle, setEditTitle] = useState('');
-  const [editDesc, setEditDesc] = useState('');
   const [imgError, setImgError] = useState(false);
   const [checkedUrl, setCheckedUrl] = useState('');
+
+  // Ref-based handle so the document-level keyboard shortcut effect only binds
+  // once and still calls the latest handler when state changes.
+  const handleCheckRef = useRef(() => {});
 
   const handleCheck = useCallback(async () => {
     const trimmed = url.trim();
@@ -43,8 +54,6 @@ export default function OgChecker() {
       setMeta(parsed);
       setIssues(foundIssues);
       setCode(tagCode);
-      setEditTitle(parsed.og.title || parsed.title);
-      setEditDesc(parsed.og.description || parsed.description);
       setCheckedUrl(finalUrl);
       showToast('Tags loaded');
     } catch (err) {
@@ -54,35 +63,40 @@ export default function OgChecker() {
     }
   }, [url, showToast]);
 
-  // Enter key to submit
+  // Keep the ref in sync with the latest handler. Effect runs after every
+  // render so the keyboard listener (bound once below) always sees fresh state.
+  useEffect(() => {
+    handleCheckRef.current = handleCheck;
+  });
+
+  // Ctrl/Cmd+Enter to submit. Bound once; latest handler called via ref.
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        handleCheck();
+        handleCheckRef.current();
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [handleCheck]);
+  }, []);
 
   const handleCopyCode = useCallback(() => {
     if (!code) return;
     navigator.clipboard.writeText(code).then(() => showToast('Copied!'));
   }, [code, showToast]);
 
-  // Derived values for previews
-  const previewTitle = editTitle || '';
-  const previewDesc = editDesc || '';
+  // Derived values
+  const displayTitle = meta?.og.title || meta?.title || '';
+  const displayDesc = meta?.og.description || meta?.description || '';
   const previewImage = meta?.og.image || meta?.twitter.image || '';
   const previewDomain = checkedUrl ? getDomain(checkedUrl) : '';
   const previewSiteName = meta?.og.siteName || previewDomain;
 
-  const titleLen = editTitle.length;
-  const descLen = editDesc.length;
-
-  const titleColor = !titleLen ? '#94a3b8' : titleLen >= 15 && titleLen <= 90 ? '#059669' : '#dc2626';
-  const descColor = !descLen ? '#94a3b8' : descLen >= 70 && descLen <= 200 ? '#059669' : '#dc2626';
+  const titleLen = displayTitle.length;
+  const descLen = displayDesc.length;
+  const titleStatusClass = `og__char-count og__char-count--${lengthStatus(titleLen, TITLE_LENGTH)}`;
+  const descStatusClass = `og__char-count og__char-count--${lengthStatus(descLen, DESC_LENGTH)}`;
 
   return (
     <div className="og">
@@ -104,15 +118,20 @@ export default function OgChecker() {
           onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
           placeholder="Enter full URL"
           disabled={loading}
+          aria-label="URL to inspect"
         />
-        <button className="og__btn og__btn--primary" onClick={handleCheck} disabled={loading}>
-          {loading ? 'Checking\u2026' : 'Check Website'}
+        <button
+          className="og__btn og__btn--primary"
+          onClick={handleCheck}
+          disabled={loading}
+        >
+          {loading ? 'Checking…' : 'Check Website'}
         </button>
       </div>
 
       {/* Loading Bar */}
       {loading && (
-        <div className="og__loading-bar">
+        <div className="og__loading-bar" role="progressbar" aria-label="Fetching page">
           <div className="og__loading-bar-inner" />
         </div>
       )}
@@ -121,10 +140,13 @@ export default function OgChecker() {
       {issues.length > 0 && (
         <div className="og__issues">
           <div className="og__issues-title">Issues found with metadata</div>
-          {issues.map((issue, i) => (
-            <div key={i} className={`og__issue og__issue--${issue.severity}`}>
-              <span className="og__issue-icon">
-                {issue.severity === 'error' ? '\u2716' : issue.severity === 'warning' ? '\u26A0' : '\u24D8'}
+          {issues.map((issue) => (
+            <div
+              key={`${issue.severity}:${issue.message}`}
+              className={`og__issue og__issue--${issue.severity}`}
+            >
+              <span className="og__issue-icon" aria-hidden="true">
+                {issue.severity === 'error' ? '✖' : issue.severity === 'warning' ? '⚠' : 'ⓘ'}
               </span>
               {issue.message}
             </div>
@@ -139,10 +161,12 @@ export default function OgChecker() {
             <h3 className="og__section-title">Social Preview</h3>
             <p className="og__section-desc">How your page looks when shared</p>
 
-            <div className="og__platform-tabs">
+            <div className="og__platform-tabs" role="tablist">
               {PLATFORMS.map((p) => (
                 <button
                   key={p.id}
+                  role="tab"
+                  aria-selected={activePlatform === p.id}
                   className={`og__platform-tab ${activePlatform === p.id ? 'og__platform-tab--active' : ''}`}
                   onClick={() => setActivePlatform(p.id)}
                 >
@@ -160,8 +184,8 @@ export default function OgChecker() {
                   {(!previewImage || imgError) && <div className="og__card-image-placeholder">No image</div>}
                   <div className="og__card-body">
                     <div className="og__card-domain">{previewDomain.toUpperCase()}</div>
-                    <div className="og__card-title">{previewTitle || 'No title'}</div>
-                    <div className="og__card-desc">{previewDesc || 'No description'}</div>
+                    <div className="og__card-title">{displayTitle || 'No title'}</div>
+                    <div className="og__card-desc">{displayDesc || 'No description'}</div>
                   </div>
                 </div>
               )}
@@ -177,8 +201,8 @@ export default function OgChecker() {
                       )}
                       <div className="og__card-body">
                         <div className="og__card-domain">{previewDomain}</div>
-                        <div className="og__card-title">{previewTitle || 'No title'}</div>
-                        <div className="og__card-desc">{previewDesc || 'No description'}</div>
+                        <div className="og__card-title">{displayTitle || 'No title'}</div>
+                        <div className="og__card-desc">{displayDesc || 'No description'}</div>
                       </div>
                     </>
                   ) : (
@@ -189,8 +213,8 @@ export default function OgChecker() {
                       {(!previewImage || imgError) && <div className="og__card-image-placeholder">No image</div>}
                       <div className="og__card-body">
                         <div className="og__card-domain">{previewDomain}</div>
-                        <div className="og__card-title">{previewTitle || 'No title'}</div>
-                        <div className="og__card-desc">{previewDesc || 'No description'}</div>
+                        <div className="og__card-title">{displayTitle || 'No title'}</div>
+                        <div className="og__card-desc">{displayDesc || 'No description'}</div>
                       </div>
                     </>
                   )}
@@ -204,7 +228,7 @@ export default function OgChecker() {
                   )}
                   {(!previewImage || imgError) && <div className="og__card-image-placeholder">No image</div>}
                   <div className="og__card-body">
-                    <div className="og__card-title">{previewTitle || 'No title'}</div>
+                    <div className="og__card-title">{displayTitle || 'No title'}</div>
                     <div className="og__card-domain">{previewDomain}</div>
                   </div>
                 </div>
@@ -218,9 +242,9 @@ export default function OgChecker() {
                     <div className="og__card-thumb-placeholder">No img</div>
                   )}
                   <div className="og__card-body">
-                    <div className="og__card-title">{previewTitle || 'No title'}</div>
-                    <div className="og__card-desc">{previewDesc || 'No description'}</div>
-                    <div className="og__card-domain">{checkedUrl}</div>
+                    <div className="og__card-title">{displayTitle || 'No title'}</div>
+                    <div className="og__card-desc">{displayDesc || 'No description'}</div>
+                    <div className="og__card-domain">{previewDomain}</div>
                   </div>
                 </div>
               )}
@@ -229,8 +253,8 @@ export default function OgChecker() {
                 <div className="og__card og__card--discord">
                   <div className="og__card-body">
                     <div className="og__card-site-name">{previewSiteName}</div>
-                    <div className="og__card-title">{previewTitle || 'No title'}</div>
-                    <div className="og__card-desc">{previewDesc || 'No description'}</div>
+                    <div className="og__card-title">{displayTitle || 'No title'}</div>
+                    <div className="og__card-desc">{displayDesc || 'No description'}</div>
                   </div>
                   {previewImage && !imgError && (
                     <img src={previewImage} alt="" className="og__card-image" onError={() => setImgError(true)} />
@@ -240,58 +264,46 @@ export default function OgChecker() {
             </div>
           </div>
 
-          {/* Technical Inspector */}
+          {/* Technical Inspector — read-only, styled as a static report (no input affordances) */}
           <div className="og__section">
             <h3 className="og__section-title">Technical OG Tag Inspector</h3>
             <p className="og__section-desc">
               Inspect your OG title, description, and image before publishing.
             </p>
 
-            <div className="og__inspector">
+            <dl className="og__inspector">
               <div className="og__field">
-                <label className="og__field-label">Title</label>
-                <input
-                  type="text"
-                  className="og__field-input"
-                  value={editTitle}
-                  readOnly
-                />
+                <dt className="og__field-label">Title</dt>
+                <dd className="og__field-value">{displayTitle || <span className="og__field-empty">No og:title found</span>}</dd>
                 <div className="og__field-meta">
-                  <span className="og__char-count" style={{ color: titleColor }}>
-                    {titleLen} characters
-                  </span>
-                  <span className="og__char-rec">Recommended: 50-60 characters</span>
+                  <span className={titleStatusClass}>{titleLen} characters</span>
+                  <span className="og__char-rec">Ideal: {TITLE_LENGTH.idealMin}-{TITLE_LENGTH.idealMax} characters</span>
                 </div>
               </div>
 
               <div className="og__field">
-                <label className="og__field-label">Description</label>
-                <textarea
-                  className="og__field-textarea"
-                  value={editDesc}
-                  readOnly
-                  rows={3}
-                />
+                <dt className="og__field-label">Description</dt>
+                <dd className="og__field-value og__field-value--long">
+                  {displayDesc || <span className="og__field-empty">No og:description found</span>}
+                </dd>
                 <div className="og__field-meta">
-                  <span className="og__char-count" style={{ color: descColor }}>
-                    {descLen} characters
-                  </span>
-                  <span className="og__char-rec">Recommended: 110-160 characters</span>
+                  <span className={descStatusClass}>{descLen} characters</span>
+                  <span className="og__char-rec">Ideal: {DESC_LENGTH.idealMin}-{DESC_LENGTH.idealMax} characters</span>
                 </div>
               </div>
 
               <div className="og__field">
-                <label className="og__field-label">Image</label>
-                <div className="og__image-row">
+                <dt className="og__field-label">Image</dt>
+                <dd className="og__image-row">
                   {previewImage && !imgError ? (
-                    <img src={previewImage} alt="OG" className="og__image-thumb" onError={() => setImgError(true)} />
+                    <img src={previewImage} alt="" className="og__image-thumb" onError={() => setImgError(true)} />
                   ) : (
                     <div className="og__image-placeholder">No image</div>
                   )}
                   <span className="og__image-url">{previewImage || 'No og:image found'}</span>
-                </div>
+                </dd>
               </div>
-            </div>
+            </dl>
           </div>
 
           {/* Meta Tags Code */}
@@ -301,12 +313,14 @@ export default function OgChecker() {
                 <span className="og__code-label">Meta Tags Code</span>
                 <button className="og__btn og__btn--copy" onClick={handleCopyCode}>Copy</button>
               </div>
-              <pre className="og__code-pre">{code.split('\n').map((line, i) => (
-                <div key={i} className="og__code-line">
-                  <span className="og__code-num">{i + 1}</span>
-                  <span className="og__code-text">{line}</span>
-                </div>
-              ))}</pre>
+              <div className="og__code-body">
+                {code.split('\n').map((line, i) => (
+                  <div key={i} className="og__code-line">
+                    <span className="og__code-num">{i + 1}</span>
+                    <span className="og__code-text">{line || ' '}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </>

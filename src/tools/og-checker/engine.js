@@ -1,51 +1,57 @@
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+// Public CORS proxies tried in order. If one fails or hangs, the next is used.
+const PROXIES = [
+  { name: 'allorigins', build: (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
+  { name: 'corsproxy',  build: (u) => `https://corsproxy.io/?${encodeURIComponent(u)}` },
+  { name: 'codetabs',   build: (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}` },
+];
 
+const FETCH_TIMEOUT_MS = 12000;
+
+// fetch() + res.text() share one AbortController so a body that never finishes
+// streaming still aborts on timeout. The previous implementation cleared the
+// timer the moment headers arrived, so a stalled body left the request hanging
+// forever (the symptom: spinning loading bar, no error toast).
 async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.text();
+  } finally {
     clearTimeout(timer);
-    return res;
-  } catch (err) {
-    clearTimeout(timer);
-    if (err.name === 'AbortError') {
-      throw new Error('Request timed out');
-    }
-    throw err;
   }
+}
+
+function describeError(err) {
+  if (err?.name === 'AbortError') return 'timed out';
+  return err?.message || 'request failed';
 }
 
 export async function fetchPageHtml(url) {
   let normalized = url.trim();
-  if (!/^https?:\/\//i.test(normalized)) {
-    normalized = 'https://' + normalized;
-  }
-  // Validate URL
+  if (!/^https?:\/\//i.test(normalized)) normalized = 'https://' + normalized;
   try {
     new URL(normalized);
   } catch {
     throw new Error('Invalid URL');
   }
 
-  const target = CORS_PROXY + encodeURIComponent(normalized);
-
-  // Try up to 2 times (initial + 1 retry on timeout)
-  let lastError;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const failures = [];
+  for (const proxy of PROXIES) {
     try {
-      const res = await fetchWithTimeout(target, 20000);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch (${res.status})`);
+      const html = await fetchWithTimeout(proxy.build(normalized), FETCH_TIMEOUT_MS);
+      if (!html || html.length < 50) {
+        failures.push(`${proxy.name}: empty response`);
+        continue;
       }
-      return { html: await res.text(), finalUrl: normalized };
+      return { html, finalUrl: normalized };
     } catch (err) {
-      lastError = err;
-      if (err.message !== 'Request timed out' || attempt === 1) throw err;
-      // Retry once on timeout
+      failures.push(`${proxy.name}: ${describeError(err)}`);
     }
   }
-  throw lastError;
+
+  throw new Error(`Could not fetch URL (${failures.join('; ')})`);
 }
 
 export function parseMetaTags(html, baseUrl) {
@@ -65,7 +71,6 @@ export function parseMetaTags(html, baseUrl) {
     }
   };
 
-  // Extract favicon
   const iconEl =
     doc.querySelector('link[rel="icon"]') ||
     doc.querySelector('link[rel="shortcut icon"]') ||
@@ -97,7 +102,6 @@ export function parseMetaTags(html, baseUrl) {
     },
   };
 
-  // Collect raw tags for code display
   const rawTags = [];
   const titleEl = doc.querySelector('title');
   if (titleEl) rawTags.push({ tag: 'title', content: meta.title });
@@ -118,6 +122,13 @@ export function parseMetaTags(html, baseUrl) {
   return meta;
 }
 
+// Title/description length recommendations.
+// Below MIN_OK or above MAX_OK → error (red).
+// Outside IDEAL range but within OK range → warning (amber).
+// Inside IDEAL range → green.
+export const TITLE_LENGTH = { minOk: 30, idealMin: 50, idealMax: 60, maxOk: 90 };
+export const DESC_LENGTH  = { minOk: 70, idealMin: 110, idealMax: 160, maxOk: 200 };
+
 export function detectIssues(meta) {
   const issues = [];
   const err = (msg) => issues.push({ severity: 'error', message: msg });
@@ -132,11 +143,23 @@ export function detectIssues(meta) {
   if (!meta.og.type) warn('Missing og:type');
   if (!meta.twitter.card) warn('Missing twitter:card');
 
-  if (meta.og.title && meta.og.title.length > 90) warn(`og:title is too long (${meta.og.title.length} chars, recommended < 90)`);
-  if (meta.og.title && meta.og.title.length < 15) warn(`og:title is too short (${meta.og.title.length} chars, recommended > 15)`);
+  const t = meta.og.title;
+  if (t) {
+    if (t.length > TITLE_LENGTH.maxOk) err(`og:title is too long (${t.length} chars, max ${TITLE_LENGTH.maxOk})`);
+    else if (t.length < TITLE_LENGTH.minOk) err(`og:title is too short (${t.length} chars, min ${TITLE_LENGTH.minOk})`);
+    else if (t.length < TITLE_LENGTH.idealMin || t.length > TITLE_LENGTH.idealMax) {
+      warn(`og:title is ${t.length} chars (ideal ${TITLE_LENGTH.idealMin}-${TITLE_LENGTH.idealMax})`);
+    }
+  }
 
-  if (meta.og.description && meta.og.description.length > 200) warn(`og:description is too long (${meta.og.description.length} chars, recommended < 200)`);
-  if (meta.og.description && meta.og.description.length < 70) warn(`og:description is too short (${meta.og.description.length} chars, recommended > 70)`);
+  const d = meta.og.description;
+  if (d) {
+    if (d.length > DESC_LENGTH.maxOk) err(`og:description is too long (${d.length} chars, max ${DESC_LENGTH.maxOk})`);
+    else if (d.length < DESC_LENGTH.minOk) err(`og:description is too short (${d.length} chars, min ${DESC_LENGTH.minOk})`);
+    else if (d.length < DESC_LENGTH.idealMin || d.length > DESC_LENGTH.idealMax) {
+      warn(`og:description is ${d.length} chars (ideal ${DESC_LENGTH.idealMin}-${DESC_LENGTH.idealMax})`);
+    }
+  }
 
   if (meta.og.image && meta.og.image.startsWith('http://')) warn('og:image uses HTTP instead of HTTPS');
 
@@ -148,6 +171,13 @@ export function detectIssues(meta) {
   }
 
   return issues;
+}
+
+export function lengthStatus(len, spec) {
+  if (!len) return 'empty';
+  if (len < spec.minOk || len > spec.maxOk) return 'error';
+  if (len < spec.idealMin || len > spec.idealMax) return 'warning';
+  return 'ok';
 }
 
 export function generateMetaTagsCode(meta) {
