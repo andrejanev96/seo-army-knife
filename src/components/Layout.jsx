@@ -1,27 +1,8 @@
 import { useState, useId } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { getToolsByCategory } from '../tools/registry';
+import { WrenchIcon, ChevronIcon } from './icons';
 import './Layout.css';
-
-function WrenchIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    </svg>
-  );
-}
-
-function ChevronIcon({ direction = 'right', ...props }) {
-  const rotations = { right: 0, left: 180, down: 90, up: -90 };
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-      style={{ transform: `rotate(${rotations[direction]}deg)` }} {...props}>
-      <path d="M6 4l4 4-4 4" />
-    </svg>
-  );
-}
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -43,7 +24,7 @@ export default function Layout() {
         <div className="sidebar__header">
           {!collapsed && (
             <div className="sidebar__brand">
-              <WrenchIcon className="sidebar__icon" width="18" height="18" />
+              <WrenchIcon size={18} className="sidebar__icon" />
               <h1 className="sidebar__title">SEO Army Knife</h1>
             </div>
           )}
@@ -53,7 +34,7 @@ export default function Layout() {
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-expanded={!collapsed}
           >
-            <ChevronIcon direction={collapsed ? 'right' : 'left'} width="14" height="14" />
+            <ChevronIcon direction={collapsed ? 'right' : 'left'} size={14} />
           </button>
         </div>
 
@@ -89,8 +70,7 @@ export default function Layout() {
                     <span>{category}</span>
                     <ChevronIcon
                       direction={isExpanded ? 'down' : 'right'}
-                      width="16"
-                      height="16"
+                      size={16}
                       className="sidebar__chevron"
                     />
                   </button>

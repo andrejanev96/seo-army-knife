@@ -179,6 +179,15 @@
   transform: scale(0.97);
 }
 
+.lc__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lc__btn:disabled:active {
+  transform: none;
+}
+
 .lc__btn--primary {
   background: #6366f1;
   color: #fff;
@@ -319,10 +328,18 @@
 }
 
 .lc__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   font-size: 12px;
   padding: 3px 0;
   color: #92400e;
-  line-height: 1.4;
+  line-height: 1.5;
+}
+
+.lc__warning-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* ── Output Panel ── */

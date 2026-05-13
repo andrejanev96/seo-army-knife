@@ -1,6 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from '../../context/useToast';
 import {
+  AlertTriangleIcon,
+  ImageIcon,
+  InfoIcon,
+  DotIcon,
+  CheckIcon,
+  ClipboardIcon,
+} from '../../components/icons';
+import {
   analyzeHtml,
   computeAutoStrip,
   computeKeepAll,
@@ -9,6 +17,13 @@ import {
   generatePreviewHtml,
 } from './engine';
 import './LinkCleaner.css';
+
+const WARNING_ICONS = {
+  broken: AlertTriangleIcon,
+  'image-only': ImageIcon,
+  heading: InfoIcon,
+  density: DotIcon,
+};
 
 export default function LinkCleaner() {
   const showToast = useToast();
@@ -38,20 +53,53 @@ export default function LinkCleaner() {
   // UI state
   const [activeTab, setActiveTab] = useState('preview');
 
+  // Undo history: a stack of prior keepMap snapshots, each with a label so
+  // the toast / button can announce what got undone.
+  const [history, setHistory] = useState([]);
+
   // Refs for stable callbacks — populated via effect so we don't write to a
   // ref during render (which the react-hooks lint rule disallows).
   const linksRef = useRef(links);
   const keepMapRef = useRef(keepMap);
   const analyzeRef = useRef(() => {});
+  const undoRef = useRef(() => {});
 
   useEffect(() => { linksRef.current = links; });
   useEffect(() => { keepMapRef.current = keepMap; });
+
+  // Record the current keepMap onto the history stack before a mutation.
+  const recordHistory = useCallback((label) => {
+    setHistory((h) => [...h, { label, keepMap: keepMapRef.current }].slice(-25));
+  }, []);
+
+  const broadcastKeepMap = useCallback((newKeep) => {
+    const frame = iframeRef.current;
+    if (!frame?.contentWindow) return;
+    const updates = linksRef.current
+      .filter((l) => !l.isImageLink && !l.isCtaLink)
+      .map((l) => ({ id: l.id, keep: newKeep[l.id] !== false }));
+    frame.contentWindow.postMessage({ type: 'srlc-update-all', updates }, '*');
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      const last = h[h.length - 1];
+      setKeepMap(last.keepMap);
+      broadcastKeepMap(last.keepMap);
+      showToast(`Undid: ${last.label}`);
+      return h.slice(0, -1);
+    });
+  }, [broadcastKeepMap, showToast]);
+
+  useEffect(() => { undoRef.current = handleUndo; });
 
   // Toggle a single link keep/remove
   const toggleLink = useCallback((id) => {
     const link = linksRef.current.find((l) => l.id === id);
     if (!link || link.isImageLink || link.isCtaLink) return;
 
+    recordHistory(link.anchorText ? `toggle "${link.anchorText.slice(0, 30)}"` : 'toggle link');
     const newKeep = !keepMapRef.current[id];
     setKeepMap((prev) => ({ ...prev, [id]: newKeep }));
 
@@ -59,7 +107,7 @@ export default function LinkCleaner() {
     if (frame?.contentWindow) {
       frame.contentWindow.postMessage({ type: 'srlc-update', id, keep: newKeep }, '*');
     }
-  }, []);
+  }, [recordHistory]);
 
   // Listen for iframe toggle messages — only from our own iframe.
   useEffect(() => {
@@ -155,28 +203,21 @@ export default function LinkCleaner() {
 
   useEffect(() => { analyzeRef.current = handleAnalyze; });
 
-  const broadcastKeepMap = useCallback((newKeep) => {
-    const frame = iframeRef.current;
-    if (!frame?.contentWindow) return;
-    const updates = linksRef.current
-      .filter((l) => !l.isImageLink && !l.isCtaLink)
-      .map((l) => ({ id: l.id, keep: newKeep[l.id] !== false }));
-    frame.contentWindow.postMessage({ type: 'srlc-update-all', updates }, '*');
-  }, []);
-
   const handleAutoStrip = useCallback(() => {
+    recordHistory('Auto-strip');
     const newKeep = computeAutoStrip(links, groups);
     setKeepMap(newKeep);
     broadcastKeepMap(newKeep);
     showToast('Auto-strip applied');
-  }, [links, groups, broadcastKeepMap, showToast]);
+  }, [links, groups, broadcastKeepMap, recordHistory, showToast]);
 
   const handleKeepAll = useCallback(() => {
+    recordHistory('Keep All');
     const newKeep = computeKeepAll(links);
     setKeepMap(newKeep);
     broadcastKeepMap(newKeep);
     showToast('All links set to keep');
-  }, [links, broadcastKeepMap, showToast]);
+  }, [links, broadcastKeepMap, recordHistory, showToast]);
 
   const handleReset = useCallback(() => {
     setHtmlInput('');
@@ -196,6 +237,7 @@ export default function LinkCleaner() {
     placeholdersRef.current = [];
     pendingPreviewRef.current = null;
     stampedHtmlRef.current = '';
+    setHistory([]);
   }, []);
 
   const handleNextArticle = useCallback((e) => {
@@ -241,12 +283,20 @@ export default function LinkCleaner() {
     if (tab === 'clean') refreshCleanHtml();
   }, [refreshCleanHtml]);
 
-  // Ctrl/Cmd+Enter to analyze. Bound once via ref.
+  // Keyboard shortcuts. Bound once; latest handlers called via refs.
   useEffect(() => {
     const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key === 'Enter') {
         e.preventDefault();
         analyzeRef.current();
+      } else if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        // Don't hijack undo inside the paste textarea — the OS undo there is
+        // what users expect. Only intercept when focus is outside form fields.
+        const tag = (e.target?.tagName || '').toLowerCase();
+        if (tag === 'textarea' || tag === 'input') return;
+        e.preventDefault();
+        undoRef.current();
       }
     };
     document.addEventListener('keydown', handler);
@@ -374,9 +424,7 @@ export default function LinkCleaner() {
       {/* Clean Article Banner */}
       {analyzed && isClean && (
         <div className="lc__clean-banner">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
+          <CheckIcon size={18} />
           This article is clean &mdash; no redundant links found!
         </div>
       )}
@@ -389,10 +437,11 @@ export default function LinkCleaner() {
           </summary>
           <div className="lc__warnings-list">
             {warnings.map((w, i) => {
-              const icons = { broken: '⚠', 'image-only': '🖼', heading: 'ⓘ', density: '●' };
+              const Icon = WARNING_ICONS[w.type] || AlertTriangleIcon;
               return (
                 <div key={`${w.type}:${i}`} className="lc__warning">
-                  <span aria-hidden="true">{icons[w.type] || '⚠'}</span> {w.message}
+                  <Icon size={14} className="lc__warning-icon" />
+                  <span>{w.message}</span>
                 </div>
               );
             })}
@@ -426,6 +475,14 @@ export default function LinkCleaner() {
             <div className="lc__tab-actions">
               <button className="lc__btn lc__btn--success" onClick={handleCopy}>
                 Copy
+              </button>
+              <button
+                className="lc__btn lc__btn--secondary"
+                onClick={handleUndo}
+                disabled={history.length === 0}
+                title={history.length ? `Undo: ${history[history.length - 1].label}` : 'Nothing to undo'}
+              >
+                Undo{history.length > 1 ? ` (${history.length})` : ''}
               </button>
               <button className="lc__btn lc__btn--secondary" onClick={handleAutoStrip}>
                 Auto-Strip
@@ -477,9 +534,7 @@ export default function LinkCleaner() {
               ) : (
                 <>
                   <div className="lc__changes-summary">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6" />
-                    </svg>
+                    <ClipboardIcon size={16} />
                     {totalChanges} change{totalChanges !== 1 ? 's' : ''}:{' '}
                     {removedLinks.length} link{removedLinks.length !== 1 ? 's' : ''} unwrapped
                     {targetSelfCount > 0 ? `, ${targetSelfCount} target="_self" removed` : ''}
