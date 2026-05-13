@@ -26,11 +26,11 @@ const corsHeaders = {
 };
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
-    if (request.method !== 'GET') {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
       return json({ error: 'method not allowed' }, 405);
     }
 
@@ -54,18 +54,27 @@ export default {
       return json({ error: 'private/internal host blocked' }, 403);
     }
 
+    // Optional: shared secret for site-owner-paired access. When INSPECTOR_KEY
+    // is configured, we send it as X-Inspector-Key on every upstream fetch.
+    // Site owners add a WAF rule on their own Cloudflare zone that bypasses
+    // bot protection when this header matches — no UA spoofing, no IP games.
+    const inspectorKey = env?.INSPECTOR_KEY;
+
     const attempts = [];
     for (const ua of CRAWLER_UAS) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
       try {
+        const upstreamHeaders = {
+          'User-Agent': ua,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Cache-Control': 'no-cache',
+        };
+        if (inspectorKey) upstreamHeaders['X-Inspector-Key'] = inspectorKey;
+
         const res = await fetch(parsed.toString(), {
-          headers: {
-            'User-Agent': ua,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Cache-Control': 'no-cache',
-          },
+          headers: upstreamHeaders,
           redirect: 'follow',
           signal: controller.signal,
           // Skip Cloudflare's own edge cache — we want a fresh fetch each call
@@ -114,7 +123,11 @@ export default {
 };
 
 function shortUa(ua) {
-  const m = ua.match(/^([A-Za-z]+(?:bot|hit|expanding)?)/i);
+  // Pick the most identifying token: prefer "*bot" / "*hit" / "*expanding"
+  // tokens anywhere in the UA string over a generic "Mozilla" prefix.
+  const known = ua.match(/\b([A-Za-z]+(?:bot|hit|expanding))\b/i);
+  if (known) return known[1].toLowerCase();
+  const m = ua.match(/^([A-Za-z]+)/);
   return m ? m[1].toLowerCase() : 'crawler';
 }
 
