@@ -34,6 +34,64 @@ export function WrenchIcon(props) {
   );
 }
 
+// Ammo.com chevron mark — the brand-guide-approved nav-and-favicon variant
+// of the shield. Per the brand guide: "favicon used for consistent branding
+// without distraction... 16px minimum web."
+//
+// Faithful to brand colors: navy header (#083167), red-and-white stripes
+// (#99161D + #fff), with a small white star at the bottom. Outline is the
+// brand-guide intermediate black (#1d1d1d).
+export function AmmoShieldIcon({ size = 24, className, title, mono = false, ...rest }) {
+  const navy = mono ? '#1d1d1d' : '#083167';
+  const red = mono ? '#1d1d1d' : '#99161D';
+  const white = '#ffffff';
+  const outline = '#1d1d1d';
+  const clipId = `shield-clip-${size}-${mono ? 'm' : 'c'}`;
+  return (
+    <svg
+      width={size}
+      height={(size * 28) / 24}
+      viewBox="0 0 24 28"
+      fill="none"
+      role={title ? 'img' : undefined}
+      aria-label={title}
+      aria-hidden={title ? undefined : true}
+      className={className}
+      {...rest}
+    >
+      <defs>
+        <clipPath id={clipId}>
+          <path d="M2 2 L22 2 L22 17.5 Q22 18.5 21.3 19.2 L12.7 26.5 Q12 27.1 11.3 26.5 L2.7 19.2 Q2 18.5 2 17.5 Z" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clipId})`}>
+        {/* Navy header bar */}
+        <rect x="0" y="0" width="24" height="7.5" fill={navy} />
+        {/* White body */}
+        <rect x="0" y="7.5" width="24" height="20.5" fill={white} />
+        {/* Red vertical stripes */}
+        <rect x="2.5" y="7.5" width="2.8" height="20.5" fill={red} />
+        <rect x="8" y="7.5" width="2.8" height="20.5" fill={red} />
+        <rect x="13.2" y="7.5" width="2.8" height="20.5" fill={red} />
+        <rect x="18.7" y="7.5" width="2.8" height="20.5" fill={red} />
+        {/* White star near the bottom point */}
+        <polygon
+          points="12,19.5 12.95,21.4 15.05,21.7 13.5,23.1 13.9,25.2 12,24.2 10.1,25.2 10.5,23.1 8.95,21.7 11.05,21.4"
+          fill={white}
+        />
+      </g>
+      {/* Shield outline */}
+      <path
+        d="M2 2 L22 2 L22 17.5 Q22 18.5 21.3 19.2 L12.7 26.5 Q12 27.1 11.3 26.5 L2.7 19.2 Q2 18.5 2 17.5 Z"
+        fill="none"
+        stroke={outline}
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ChevronIcon({ direction = 'right', ...props }) {
   const r = { right: 0, left: 180, down: 90, up: -90 };
   return (

@@ -1,7 +1,8 @@
 import { useState, useId } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { getToolsByCategory } from '../tools/registry';
-import { WrenchIcon, ChevronIcon } from './icons';
+import { AmmoShieldIcon, ChevronIcon } from './icons';
+import CurrentDraftBar from './CurrentDraftBar';
 import './Layout.css';
 
 export default function Layout() {
@@ -22,11 +23,16 @@ export default function Layout() {
     <div className={`layout ${collapsed ? 'layout--collapsed' : ''}`}>
       <aside className="sidebar" aria-label="Tool navigation">
         <div className="sidebar__header">
-          {!collapsed && (
+          {!collapsed ? (
             <div className="sidebar__brand">
-              <WrenchIcon size={18} className="sidebar__icon" />
-              <h1 className="sidebar__title">SEO Army Knife</h1>
+              <AmmoShieldIcon size={28} className="sidebar__icon" title="Ammo.com" />
+              <div className="sidebar__wordmark">
+                <span className="brand-chip">SEO</span>
+                <h1 className="sidebar__title">Army Knife</h1>
+              </div>
             </div>
+          ) : (
+            <AmmoShieldIcon size={22} className="sidebar__icon sidebar__icon--solo" title="Ammo.com" />
           )}
           <button
             className="sidebar__toggle"
@@ -96,6 +102,7 @@ export default function Layout() {
         )}
       </aside>
       <main className="main-content">
+        <CurrentDraftBar />
         <Outlet />
       </main>
     </div>

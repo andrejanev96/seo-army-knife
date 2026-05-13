@@ -1,15 +1,22 @@
-# og-fetch
+# crawler-proxy (deployed as `og-fetch`)
 
-A 100-line Cloudflare Worker that proxies HTML fetches for the OG Tag
-Checker. Sends a rotating set of social-crawler User-Agents that
-Cloudflare's default "Allow legitimate crawlers" rule whitelists, so
-~70-80% of Cloudflare-protected pages become reachable without a paid
+A small Cloudflare Worker that proxies HTML / status fetches for the SEO
+Army Knife toolkit. Sends a rotating set of social-crawler User-Agents
+that Cloudflare's default "Allow legitimate crawlers" rule whitelists,
+so ~70-80% of Cloudflare-protected pages become reachable without a paid
 headless-browser service.
 
-## What it does on each request
+> The Cloudflare-side name is still `og-fetch` (in `wrangler.toml`)
+> because renaming the deployed worker would require coordinated env-var
+> updates. Functionally it's the toolkit's general-purpose crawler proxy.
+
+## Modes
+
+### `mode=raw` (default — full HTML)
 
 ```
 GET /?url=<encoded URL>
+GET /?url=<encoded URL>&mode=raw
 ```
 
 1. Validates the URL is absolute http(s) and not a private/internal host.
@@ -24,6 +31,30 @@ GET /?url=<encoded URL>
    `X-Og-Fetch-Ua` response header naming which crawler identity won.
 4. If every UA gets blocked or times out, returns `502` with a JSON
    body listing what happened on each attempt.
+
+### `mode=head` (status + redirect chain)
+
+```
+GET /?url=<encoded URL>&mode=head
+```
+
+Walks the redirect chain manually (up to 10 hops) so callers see every
+intermediate URL and status, not just the final landing. Returns JSON:
+
+```json
+{
+  "chain": [
+    { "url": "http://example.com/x", "status": 301, "location": "https://example.com/x" },
+    { "url": "https://example.com/x", "status": 200, "location": null }
+  ],
+  "finalUrl": "https://example.com/x",
+  "finalStatus": 200
+}
+```
+
+Uses `HEAD` and falls back to a ranged `GET` (`Range: bytes=0-0`) for
+servers that 405 on HEAD. Used by the upcoming Redirect Chain Analyzer
+and Bulk Status Checker tools.
 
 ## Deploy
 
@@ -54,13 +85,17 @@ That URL is your endpoint.
 Create `.env.local` at the repo root (gitignored via `*.local`):
 
 ```
-VITE_OG_PROXY_URL=https://og-fetch.<your-account>.workers.dev
+VITE_CRAWLER_PROXY_URL=https://og-fetch.<your-account>.workers.dev
 ```
 
-Restart `npm run dev`. The OG Checker now tries your Worker first and
-falls back to the three public proxies if it fails or times out.
+Restart `npm run dev`. Tools now try your Worker first and fall back to
+the three public proxies if it fails or times out.
 
-For production builds (GitHub Pages, etc.), set `VITE_OG_PROXY_URL`
+> Backwards compatibility: the legacy `VITE_OG_PROXY_URL` is still
+> honored as a fallback, so existing `.env.local` files keep working.
+> New deployments should prefer `VITE_CRAWLER_PROXY_URL`.
+
+For production builds (GitHub Pages, etc.), set `VITE_CRAWLER_PROXY_URL`
 in your deploy environment — for GitHub Actions, add it as a repo
 variable and reference it in the workflow `env:` block.
 

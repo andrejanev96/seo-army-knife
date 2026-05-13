@@ -1,44 +1,81 @@
+/*
+ * SEO Army Knife — design tokens.
+ *
+ * Palette + typography follow the AC Brand Style Guide:
+ *   - Dark backgrounds (Revolutionary Black + gray ramp)
+ *   - GOLD is the PRIMARY action color
+ *   - RED is SECONDARY (and used in the label-chip pattern)
+ *   - White text on dark; blue reserved for info status only
+ *   - Roboto for everything (loaded in index.html)
+ *
+ * Variable names are kept stable from the previous (light-indigo) palette
+ * so existing tools inherit the new look without per-tool edits.
+ */
 :root {
-  /* Colors */
-  --color-bg: #f8fafc;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f1f5f9;
-  --color-text: #1e293b;
-  --color-text-muted: #64748b;
-  --color-muted: #94a3b8;
-  --color-border: #e2e8f0;
+  /* ── Surfaces (gray ramp from brand guide) ── */
+  --color-bg: #111111;             /* page background — gray 75 */
+  --color-bg-elevated: #1e1e1e;    /* gray 100 — main content backdrop */
+  --color-surface: #2c2c2c;        /* gray 200 — cards / containers */
+  --color-surface-muted: #393939;  /* gray 300 — inputs, deep panels */
+  --color-surface-strong: #494949; /* gray 400 — hover/active surfaces */
+  --color-overlay: #242424;        /* gray 150 — modal/overlay backdrop */
 
-  --color-accent: #6366f1;
-  --color-accent-hover: #4f46e5;
-  --color-accent-soft: rgba(99, 102, 241, 0.12);
+  /* ── Borders / strokes ── */
+  --color-border: #393939;         /* gray 300 */
+  --color-border-strong: #494949;  /* gray 400 */
 
-  --color-success: #059669;
-  --color-success-bg: #ecfdf5;
-  --color-warning: #b45309;
-  --color-warning-bg: #fffbeb;
-  --color-danger: #dc2626;
-  --color-danger-bg: #fef2f2;
-  --color-info: #1d4ed8;
-  --color-info-bg: #eff6ff;
+  /* ── Text ── */
+  --color-text: #ffffff;
+  --color-text-muted: #888a8c;     /* light grey from logo palette */
+  --color-muted: #5c5c5c;          /* gray 500 — content icons */
 
-  --color-sidebar-from: #1e293b;
-  --color-sidebar-to: #0f172a;
+  /* ── Accents ── */
+  /* Gold = primary action (from brand "Primary" tile, gold 600) */
+  --color-accent: #bf9400;
+  --color-accent-hover: #d4a017;   /* gold 500 — lighter on hover */
+  --color-accent-soft: rgba(212, 160, 23, 0.14);
+  --color-accent-glow: rgba(212, 160, 23, 0.35);
 
-  /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Red = secondary / destructive / label chip */
+  --color-secondary: #99161d;      /* brand red (logo + chip) */
+  --color-secondary-hover: #b81d24;
+  --color-secondary-soft: rgba(153, 22, 29, 0.18);
+
+  /* ── Status ── */
+  --color-success: #29c882;        /* green 500 */
+  --color-success-bg: rgba(41, 200, 130, 0.12);
+  --color-warning: #d4a017;        /* gold 500 doubles as warning */
+  --color-warning-bg: rgba(212, 160, 23, 0.14);
+  --color-danger: #d44c3e;         /* brand link/danger red */
+  --color-danger-bg: rgba(212, 76, 62, 0.14);
+  --color-info: #4a9bff;           /* blue 400 — used sparingly */
+  --color-info-bg: rgba(74, 155, 255, 0.12);
+
+  /* Link color from styleguide (4:1 contrast on dark) */
+  --color-link: #d44c3e;
+
+  /* ── Sidebar gradient ── */
+  --color-sidebar-from: #1d1d1d;   /* container black */
+  --color-sidebar-to: #0a0a0a;     /* near-Revolutionary-Black */
+
+  /* ── Typography ── */
+  --font-sans: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
 
-  /* Spacing / radius / shadow */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* ── Spacing / radius / shadow ── */
+  --radius-sm: 4px;     /* brand favors crisp rectangles */
+  --radius-md: 6px;
+  --radius-lg: 10px;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 0 3px var(--color-accent-soft), 0 4px 18px var(--color-accent-glow);
 
   --transition-fast: 0.15s ease;
+  --transition-mid: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ── Reset ── */
 *,
 *::before,
 *::after {
@@ -47,27 +84,68 @@
   padding: 0;
 }
 
+html, body {
+  background: var(--color-bg);
+}
+
 body {
   font-family: var(--font-sans);
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100vh;
+  background: var(--color-bg);
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+/* ── Brand label chip ──
+ * Mirrors the AC Brand Guide: white bold text on a red rectangle, used
+ * as a tag/section-label throughout the brand. Pair with regular text.
+ */
+.brand-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--color-secondary);
+  border-radius: 2px;
+  line-height: 1.2;
+}
+
+.brand-chip--gold {
+  background: var(--color-accent);
+  color: #111;
+}
+
+.brand-chip--muted {
+  background: var(--color-surface-strong);
+  color: var(--color-text-muted);
 }
 
 /* ── Shared button styles ── */
-
 .btn {
   padding: 0.6rem 1.5rem;
   font-size: 0.82rem;
-  font-weight: 600;
-  border: none;
-  border-radius: var(--radius-md);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background var(--transition-fast), transform 0.1s, box-shadow var(--transition-fast);
+  font-family: inherit;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform 0.1s, box-shadow var(--transition-fast);
 }
 
 .btn:focus-visible {
@@ -80,23 +158,28 @@ body {
 }
 
 .btn--copy {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.25);
+  background: var(--color-accent);
+  color: #111;
+  border-color: var(--color-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .btn--copy:hover {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: 0 4px 14px var(--color-accent-glow);
 }
 
 .btn--clear {
-  background: var(--color-border);
-  color: #475569;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
 }
 
 .btn--clear:hover {
-  background: #cbd5e1;
+  background: var(--color-surface-strong);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
 }
 
 .error-message {
@@ -118,4 +201,46 @@ body {
   font-size: 1.1rem;
   color: var(--color-text);
   margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+/* ── Tool page route-transition wrapper ──
+ * ToolPage re-keys on tool.id so this animation plays on every navigation
+ * between tools. CSS only — no router-transition library. */
+.tool-page {
+  animation: sak-fade-up 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ── Global animation primitives ── */
+@keyframes sak-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sak-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sak-slide-down {
+  from { opacity: 0; transform: translateY(-8px); max-height: 0; }
+  to   { opacity: 1; transform: translateY(0); max-height: 600px; }
+}
+
+@keyframes sak-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes sak-pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 var(--color-accent-glow); }
+  50%      { box-shadow: 0 0 0 6px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

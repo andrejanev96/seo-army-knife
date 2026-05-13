@@ -60,6 +60,14 @@ export default {
     // bot protection when this header matches — no UA spoofing, no IP games.
     const inspectorKey = env?.INSPECTOR_KEY;
 
+    const mode = (url.searchParams.get('mode') || 'raw').toLowerCase();
+    if (mode === 'head') {
+      return handleHeadMode(parsed, inspectorKey);
+    }
+    if (mode !== 'raw') {
+      return json({ error: `unknown mode "${mode}" (supported: raw, head)` }, 400);
+    }
+
     const attempts = [];
     for (const ua of CRAWLER_UAS) {
       const controller = new AbortController();
@@ -121,6 +129,86 @@ export default {
     );
   },
 };
+
+// `mode=head` — walks the redirect chain manually so callers can see every
+// hop, not just the final URL. Uses HEAD first; falls back to a small GET
+// (Range: bytes=0-0) if the server 405s HEAD. Returns JSON, never HTML.
+const MAX_REDIRECTS = 10;
+async function handleHeadMode(parsed, inspectorKey) {
+  const chain = [];
+  let currentUrl = parsed.toString();
+  let finalStatus = 0;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    let parsedHop;
+    try {
+      parsedHop = new URL(currentUrl);
+    } catch {
+      chain.push({ url: currentUrl, status: 0, location: null, error: 'invalid redirect target' });
+      break;
+    }
+    if (!/^https?:$/.test(parsedHop.protocol) || isPrivateHost(parsedHop.hostname)) {
+      chain.push({ url: currentUrl, status: 0, location: null, error: 'blocked host' });
+      break;
+    }
+
+    const upstreamHeaders = {
+      'User-Agent': CRAWLER_UAS[0],
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.5',
+    };
+    if (inspectorKey) upstreamHeaders['X-Inspector-Key'] = inspectorKey;
+
+    let res;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      res = await fetch(currentUrl, {
+        method: 'HEAD',
+        headers: upstreamHeaders,
+        redirect: 'manual',
+        signal: controller.signal,
+        cf: { cacheTtl: 0, cacheEverything: false },
+      });
+      // Some servers reject HEAD outright. Retry with a tiny ranged GET.
+      if (res.status === 405 || res.status === 501) {
+        res = await fetch(currentUrl, {
+          method: 'GET',
+          headers: { ...upstreamHeaders, Range: 'bytes=0-0' },
+          redirect: 'manual',
+          signal: controller.signal,
+          cf: { cacheTtl: 0, cacheEverything: false },
+        });
+      }
+    } catch (err) {
+      clearTimeout(timer);
+      const reason = err?.name === 'AbortError' ? 'timeout' : (err?.message || 'fetch failed');
+      chain.push({ url: currentUrl, status: 0, location: null, error: reason });
+      break;
+    }
+    clearTimeout(timer);
+
+    const status = res.status;
+    const location = res.headers.get('location');
+    chain.push({ url: currentUrl, status, location: location || null });
+    finalStatus = status;
+
+    if (status >= 300 && status < 400 && location) {
+      let next;
+      try { next = new URL(location, currentUrl).toString(); }
+      catch { break; }
+      if (next === currentUrl) break; // self-redirect loop guard
+      currentUrl = next;
+      continue;
+    }
+    break;
+  }
+
+  return new Response(
+    JSON.stringify({ chain, finalUrl: currentUrl, finalStatus }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
 
 function shortUa(ua) {
   // Pick the most identifying token: prefer "*bot" / "*hit" / "*expanding"

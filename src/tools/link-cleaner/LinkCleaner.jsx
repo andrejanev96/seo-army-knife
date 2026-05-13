@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from '../../context/useToast';
+import { useCurrentDraft } from '../../context/useCurrentDraft';
 import {
   AlertTriangleIcon,
   ImageIcon,
@@ -27,6 +28,7 @@ const WARNING_ICONS = {
 
 export default function LinkCleaner() {
   const showToast = useToast();
+  const { draft, setDraft } = useCurrentDraft();
   const iframeRef = useRef(null);
   const previewReadyRef = useRef(false);
   const placeholdersRef = useRef([]);
@@ -166,6 +168,11 @@ export default function LinkCleaner() {
     const html = htmlInput.trim();
     if (!html) { showToast('Paste some HTML first', true); return; }
 
+    // Mirror the input into the cross-tool draft buffer so subsequent
+    // audits (heading-auditor, image-audit, schema-generator) can read
+    // the same article without re-pasting.
+    setDraft(html);
+
     const result = analyzeHtml(html, domain);
     const autoKeep = computeAutoStrip(result.links, result.groups);
     const removed = result.links.filter((l) => !autoKeep[l.id]).length;
@@ -199,7 +206,13 @@ export default function LinkCleaner() {
     } else {
       showToast(`${result.stats.totalLinks} links, ${result.stats.uniqueUrls} unique URLs — ${removed} marked for removal`);
     }
-  }, [htmlInput, domain, showToast]);
+  }, [htmlInput, domain, showToast, setDraft]);
+
+  const handleLoadFromDraft = useCallback(() => {
+    if (!draft?.html) { showToast('No current draft set', true); return; }
+    setHtmlInput(draft.html);
+    showToast('Loaded from current draft');
+  }, [draft, showToast]);
 
   useEffect(() => { analyzeRef.current = handleAnalyze; });
 
@@ -363,6 +376,16 @@ export default function LinkCleaner() {
             <button className="lc__btn lc__btn--primary" onClick={handleAnalyze}>
               Analyze &amp; Auto-Strip
             </button>
+            {draft && (
+              <button
+                type="button"
+                className="lc__btn lc__btn--secondary"
+                onClick={handleLoadFromDraft}
+                title={draft.title || 'Current draft'}
+              >
+                Load from current draft
+              </button>
+            )}
             <button className="lc__btn lc__btn--secondary" onClick={handleReset}>
               Reset
             </button>

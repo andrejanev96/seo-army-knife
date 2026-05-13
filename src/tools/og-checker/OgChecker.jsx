@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '../../context/useToast';
+import { useCurrentDraft } from '../../context/useCurrentDraft';
 import { SeverityIcon } from '../../components/icons';
 import {
   fetchPageHtml,
@@ -23,6 +24,7 @@ const PLATFORMS = [
 
 export default function OgChecker() {
   const showToast = useToast();
+  const { draft, setDraft } = useCurrentDraft();
   const [inputMode, setInputMode] = useState('url'); // 'url' | 'html'
   const [url, setUrl] = useState('');
   const [pastedHtml, setPastedHtml] = useState('');
@@ -88,11 +90,20 @@ export default function OgChecker() {
     resetResults();
     try {
       presentParsed(html, pastedBaseUrl.trim());
+      // Mirror the pasted article into the cross-tool draft buffer so the
+      // next tool can pick up where the user left off.
+      setDraft(html);
       showToast('Tags parsed');
     } catch (err) {
       showToast(err.message || 'Could not parse HTML', true);
     }
-  }, [pastedHtml, pastedBaseUrl, showToast]);
+  }, [pastedHtml, pastedBaseUrl, showToast, setDraft]);
+
+  const handleLoadFromDraft = useCallback(() => {
+    if (!draft?.html) { showToast('No current draft set', true); return; }
+    setPastedHtml(draft.html);
+    showToast('Loaded from current draft');
+  }, [draft, showToast]);
 
   // Keep the ref in sync with whichever handler is active for the current
   // input mode. Effect runs after every render so the keyboard listener
@@ -208,6 +219,16 @@ export default function OgChecker() {
             <button className="og__btn og__btn--primary" onClick={handleInspectHtml}>
               Inspect Pasted HTML
             </button>
+            {draft && (
+              <button
+                type="button"
+                className="og__btn og__btn--ghost"
+                onClick={handleLoadFromDraft}
+                title={draft.title || 'Current draft'}
+              >
+                Load from current draft
+              </button>
+            )}
             <span className="og__shortcut">Ctrl/Cmd + Enter</span>
           </div>
         </div>

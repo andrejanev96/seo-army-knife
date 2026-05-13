@@ -10,7 +10,7 @@
 .workbench__title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #0f172a;
+  color: #ffffff;
   margin-bottom: 0.4rem;
   letter-spacing: -0.01em;
 }
@@ -18,7 +18,7 @@
 .workbench__description {
   font-size: 0.85rem;
   line-height: 1.55;
-  color: #64748b;
+  color: #888a8c;
   max-width: 720px;
 }
 
@@ -38,7 +38,7 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: #888a8c;
   margin-bottom: 0.5rem;
 }
 
@@ -46,42 +46,42 @@
   width: 100%;
   height: 520px;
   padding: 1.1rem;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.65;
-  color: #1e293b;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   resize: vertical;
   tab-size: 2;
   transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 .workbench__textarea::placeholder {
-  color: #94a3b8;
+  color: var(--color-muted);
 }
 
 .workbench__textarea:focus {
   outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft), var(--shadow-sm);
 }
 
 .workbench__textarea--output {
-  background: #f1f5f9;
-  color: #166534;
-  border-color: #e2e8f0;
+  background: var(--color-surface);
+  color: var(--color-success);
+  border-color: var(--color-border);
 }
 
 @keyframes flash {
   0% {
-    border-color: #22c55e;
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15), 0 1px 3px rgba(0, 0, 0, 0.04);
+    border-color: var(--color-success);
+    box-shadow: 0 0 0 3px rgba(41, 200, 130, 0.15), 0 1px 3px rgba(0, 0, 0, 0.04);
   }
   100% {
-    border-color: #e2e8f0;
+    border-color: #393939;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   }
 }

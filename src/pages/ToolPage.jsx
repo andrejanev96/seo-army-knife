@@ -10,12 +10,15 @@ export default function ToolPage() {
     return <div className="error-message">Tool not found.</div>;
   }
 
-  // Custom component tools render their own UI
-  if (tool.component) {
-    const CustomComponent = tool.component;
-    return <CustomComponent key={tool.id} tool={tool} />;
-  }
+  // Re-keying on tool.id forces a remount on route change, which re-runs
+  // the fade-up entrance animation. CSS-only; no router-transition lib.
+  const inner = tool.component
+    ? <tool.component tool={tool} />
+    : <ToolWorkbench tool={tool} />;
 
-  // Standard tools use the shared ToolWorkbench
-  return <ToolWorkbench key={tool.id} tool={tool} />;
+  return (
+    <div className="tool-page" key={tool.id}>
+      {inner}
+    </div>
+  );
 }
