@@ -23,7 +23,10 @@ const PLATFORMS = [
 
 export default function OgChecker() {
   const showToast = useToast();
+  const [inputMode, setInputMode] = useState('url'); // 'url' | 'html'
   const [url, setUrl] = useState('');
+  const [pastedHtml, setPastedHtml] = useState('');
+  const [pastedBaseUrl, setPastedBaseUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [meta, setMeta] = useState(null);
   const [issues, setIssues] = useState([]);
@@ -35,29 +38,38 @@ export default function OgChecker() {
 
   // Ref-based handle so the document-level keyboard shortcut effect only binds
   // once and still calls the latest handler when state changes.
-  const handleCheckRef = useRef(() => {});
+  const submitRef = useRef(() => {});
+
+  const resetResults = () => {
+    setMeta(null);
+    setIssues([]);
+    setCode('');
+    setImgError(false);
+    setFetchError('');
+  };
+
+  const presentParsed = (html, finalUrl) => {
+    const parsed = parseMetaTags(html, finalUrl || 'about:blank');
+    const foundIssues = detectIssues(parsed);
+    const tagCode = generateMetaTagsCode(parsed);
+    setMeta(parsed);
+    setIssues(foundIssues);
+    setCode(tagCode);
+    // Prefer canonical / og:url over the user-supplied base, since the page
+    // itself is the most authoritative source of what URL it represents.
+    setCheckedUrl(parsed.canonical || parsed.og.url || finalUrl || '');
+  };
 
   const handleCheck = useCallback(async () => {
     const trimmed = url.trim();
     if (!trimmed) { showToast('Enter a URL first', true); return; }
 
     setLoading(true);
-    setMeta(null);
-    setIssues([]);
-    setCode('');
-    setImgError(false);
-    setFetchError('');
+    resetResults();
 
     try {
       const { html, finalUrl } = await fetchPageHtml(trimmed);
-      const parsed = parseMetaTags(html, finalUrl);
-      const foundIssues = detectIssues(parsed);
-      const tagCode = generateMetaTagsCode(parsed);
-
-      setMeta(parsed);
-      setIssues(foundIssues);
-      setCode(tagCode);
-      setCheckedUrl(finalUrl);
+      presentParsed(html, finalUrl);
       showToast('Tags loaded');
     } catch (err) {
       const msg = err.message || 'Could not fetch URL';
@@ -69,18 +81,32 @@ export default function OgChecker() {
     }
   }, [url, showToast]);
 
-  // Keep the ref in sync with the latest handler. Effect runs after every
-  // render so the keyboard listener (bound once below) always sees fresh state.
+  const handleInspectHtml = useCallback(() => {
+    const html = pastedHtml.trim();
+    if (!html) { showToast('Paste HTML first', true); return; }
+
+    resetResults();
+    try {
+      presentParsed(html, pastedBaseUrl.trim());
+      showToast('Tags parsed');
+    } catch (err) {
+      showToast(err.message || 'Could not parse HTML', true);
+    }
+  }, [pastedHtml, pastedBaseUrl, showToast]);
+
+  // Keep the ref in sync with whichever handler is active for the current
+  // input mode. Effect runs after every render so the keyboard listener
+  // (bound once below) always sees fresh state.
   useEffect(() => {
-    handleCheckRef.current = handleCheck;
+    submitRef.current = inputMode === 'html' ? handleInspectHtml : handleCheck;
   });
 
-  // Ctrl/Cmd+Enter to submit. Bound once; latest handler called via ref.
+  // Ctrl/Cmd+Enter to submit the current mode's primary action.
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        handleCheckRef.current();
+        submitRef.current();
       }
     };
     document.addEventListener('keydown', handler);
@@ -109,31 +135,83 @@ export default function OgChecker() {
       <div className="og__header">
         <h2 className="og__title">OG Tag Checker</h2>
         <p className="og__description">
-          Enter a URL to inspect its Open Graph and meta tags. See how links appear when shared
-          on social platforms and verify metadata on your articles.
+          Inspect a page's Open Graph and meta tags. Fetch by URL when the site is open,
+          or paste the raw HTML for pages behind bot protection, auth, or staging.
         </p>
       </div>
 
-      {/* URL Input */}
-      <div className="og__input-bar">
-        <input
-          type="url"
-          className="og__url-input"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
-          placeholder="Enter full URL"
-          disabled={loading}
-          aria-label="URL to inspect"
-        />
+      {/* Input mode toggle */}
+      <div className="og__mode-tabs" role="tablist" aria-label="Input mode">
         <button
-          className="og__btn og__btn--primary"
-          onClick={handleCheck}
-          disabled={loading}
+          role="tab"
+          aria-selected={inputMode === 'url'}
+          className={`og__mode-tab ${inputMode === 'url' ? 'og__mode-tab--active' : ''}`}
+          onClick={() => setInputMode('url')}
         >
-          {loading ? 'Checking…' : 'Check Website'}
+          From URL
+        </button>
+        <button
+          role="tab"
+          aria-selected={inputMode === 'html'}
+          className={`og__mode-tab ${inputMode === 'html' ? 'og__mode-tab--active' : ''}`}
+          onClick={() => setInputMode('html')}
+        >
+          Paste HTML
         </button>
       </div>
+
+      {inputMode === 'url' ? (
+        <div className="og__input-bar">
+          <input
+            type="url"
+            className="og__url-input"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
+            placeholder="Enter full URL"
+            disabled={loading}
+            aria-label="URL to inspect"
+          />
+          <button
+            className="og__btn og__btn--primary"
+            onClick={handleCheck}
+            disabled={loading}
+          >
+            {loading ? 'Checking…' : 'Check Website'}
+          </button>
+        </div>
+      ) : (
+        <div className="og__paste-mode">
+          <p className="og__paste-hint">
+            In your browser, open the page → <kbd>Cmd</kbd>+<kbd>U</kbd> (or right-click →
+            View Source) → <kbd>Cmd</kbd>+<kbd>A</kbd> → <kbd>Cmd</kbd>+<kbd>C</kbd> →
+            paste below. Works on any page you can see, including Cloudflare-protected,
+            authenticated, and staging URLs.
+          </p>
+          <input
+            type="url"
+            className="og__url-input"
+            value={pastedBaseUrl}
+            onChange={(e) => setPastedBaseUrl(e.target.value)}
+            placeholder="Source URL (optional — used to resolve relative image paths)"
+            aria-label="Source URL for the pasted HTML"
+          />
+          <textarea
+            className="og__paste-textarea"
+            value={pastedHtml}
+            onChange={(e) => setPastedHtml(e.target.value)}
+            placeholder="Paste the page's HTML here…"
+            spellCheck={false}
+            aria-label="HTML to inspect"
+          />
+          <div className="og__paste-actions">
+            <button className="og__btn og__btn--primary" onClick={handleInspectHtml}>
+              Inspect Pasted HTML
+            </button>
+            <span className="og__shortcut">Ctrl/Cmd + Enter</span>
+          </div>
+        </div>
+      )}
 
       {/* Loading Bar */}
       {loading && (
